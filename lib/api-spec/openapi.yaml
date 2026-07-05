@@ -3,13 +3,27 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: CodeArena competitive programming platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: Auth
+    description: Browser and mobile authentication endpoints.
+  - name: languages
+    description: Supported judge languages
+  - name: problems
+    description: Problem management
+  - name: submissions
+    description: Code submissions and judging
+  - name: contests
+    description: Contests and standings
+  - name: dashboard
+    description: User dashboard aggregates
+  - name: judge0
+    description: Internal Judge0 webhook
 paths:
   /healthz:
     get:
@@ -24,7 +38,570 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/user:
+    get:
+      tags: [Auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Auth status resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+  /login:
+    get:
+      tags: [Auth]
+      operationId: beginBrowserLogin
+      summary: Start the browser OIDC login flow
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          description: Relative path to redirect to after login (must start with `/`). Defaults to `/`.
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to the OIDC authorization endpoint.
+  /callback:
+    get:
+      tags: [Auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete the browser OIDC login flow
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: iss
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+      responses:
+        '302':
+          description: Redirect to the `returnTo` path on success (defaults to `/`) or `/api/login` on failure.
+  /logout:
+    get:
+      tags: [Auth]
+      operationId: logoutBrowserSession
+      summary: Clear the session and begin OIDC logout
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '302':
+          description: Redirect to the OIDC provider logout URL.
+  /mobile-auth/token-exchange:
+    post:
+      tags: [Auth]
+      operationId: exchangeMobileAuthorizationCode
+      summary: Exchange a mobile OIDC code for a session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MobileTokenExchangeRequest'
+      responses:
+        '200':
+          description: Session created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileTokenExchangeSuccess'
+        '400':
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Token did not contain usable claims.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Token exchange failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /mobile-auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logoutMobileSession
+      summary: Delete a mobile session token
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+      responses:
+        '200':
+          description: Logout processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
+
+  /languages:
+    get:
+      operationId: listLanguages
+      tags: [languages]
+      summary: List supported judge languages
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Language"
+
+  /problems:
+    get:
+      operationId: listProblems
+      tags: [problems]
+      summary: List problems
+      parameters:
+        - name: difficulty
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ProblemDifficulty"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProblemSummary"
+    post:
+      operationId: createProblem
+      tags: [problems]
+      summary: Create a problem (must be signed in)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProblemInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /problems/{id}:
+    get:
+      operationId: getProblem
+      tags: [problems]
+      summary: Get a problem with its sample test cases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    patch:
+      operationId: updateProblem
+      tags: [problems]
+      summary: Update a problem
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProblemUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    delete:
+      operationId: deleteProblem
+      tags: [problems]
+      summary: Delete a problem
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /problems/{id}/testcases:
+    get:
+      operationId: listProblemTestCases
+      tags: [problems]
+      summary: List all test cases for a problem, including hidden ones (setter view)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TestCase"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    post:
+      operationId: createTestCase
+      tags: [problems]
+      summary: Add a test case to a problem
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestCaseInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestCase"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /testcases/{id}:
+    delete:
+      operationId: deleteTestCase
+      tags: [problems]
+      summary: Delete a test case
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /submissions:
+    get:
+      operationId: listSubmissions
+      tags: [submissions]
+      summary: List the current user's submissions
+      parameters:
+        - name: problemId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: contestId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SubmissionSummary"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    post:
+      operationId: createSubmission
+      tags: [submissions]
+      summary: Submit code for judging (queues async Judge0 execution)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionInput"
+      responses:
+        "201":
+          description: Queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+        "400":
+          description: Invalid submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /submissions/{id}:
+    get:
+      operationId: getSubmission
+      tags: [submissions]
+      summary: Get a submission with per-test-case results
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /judge0/callback/{testResultId}:
+    post:
+      operationId: receiveJudge0Callback
+      tags: [judge0]
+      summary: Internal webhook invoked by Judge0 when a test case finishes executing
+      parameters:
+        - name: testResultId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Judge0CallbackPayload"
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AckResponse"
+
+  /contests:
+    get:
+      operationId: listContests
+      tags: [contests]
+      summary: List contests
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContestSummary"
+    post:
+      operationId: createContest
+      tags: [contests]
+      summary: Create a contest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContestInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contest"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /contests/{id}:
+    get:
+      operationId: getContest
+      tags: [contests]
+      summary: Get a contest with its problem set
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contest"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /contests/{id}/leaderboard:
+    get:
+      operationId: getContestLeaderboard
+      tags: [contests]
+      summary: Get the live standings for a contest
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get the current user's dashboard summary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
 components:
+  parameters:
+    AuthorizationSessionHeader:
+      name: Authorization
+      in: header
+      required: false
+      description: Opaque session token — `Bearer <sid>`.
+      schema:
+        type: string
+    SessionCookie:
+      name: sid
+      in: cookie
+      required: false
+      description: Browser session cookie.
+      schema:
+        type: string
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +611,522 @@ components:
       required:
         - status
 
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    AckResponse:
+      type: object
+      required: [received]
+      properties:
+        received:
+          type: boolean
+          const: true
+
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, profileImageUrl]
+      properties:
+        id:
+          type: string
+        email:
+          type: [string, 'null']
+          format: email
+        firstName:
+          type: [string, 'null']
+        lastName:
+          type: [string, 'null']
+        profileImageUrl:
+          type: [string, 'null']
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AuthUser'
+            - type: 'null'
+    MobileTokenExchangeRequest:
+      type: object
+      required: [code, code_verifier, redirect_uri, state]
+      properties:
+        code:
+          type: string
+          minLength: 1
+        code_verifier:
+          type: string
+          minLength: 1
+        redirect_uri:
+          type: string
+          minLength: 1
+          format: uri
+        state:
+          type: string
+          minLength: 1
+        nonce:
+          type: string
+          minLength: 1
+    MobileTokenExchangeSuccess:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    LogoutSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          const: true
+
+    Language:
+      type: object
+      required: [id, name, judge0Id, monacoId, timeMultiplier, memoryMultiplier]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        judge0Id:
+          type: integer
+        monacoId:
+          type: string
+        timeMultiplier:
+          type: number
+        memoryMultiplier:
+          type: number
+
+    ProblemDifficulty:
+      type: string
+      enum: [easy, medium, hard]
+
+    ProblemSummary:
+      type: object
+      required: [id, slug, title, difficulty, points, tags, solvedCount, createdAt]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        difficulty:
+          $ref: "#/components/schemas/ProblemDifficulty"
+        points:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        solvedCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    Problem:
+      type: object
+      required: [id, slug, title, description, difficulty, points, tags, cpuTimeLimitSeconds, memoryLimitKb, sampleTestCases, solvedCount, createdAt]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        difficulty:
+          $ref: "#/components/schemas/ProblemDifficulty"
+        points:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        cpuTimeLimitSeconds:
+          type: number
+          description: Base CPU time limit in seconds, multiplied per-language.
+        memoryLimitKb:
+          type: integer
+          description: Base memory limit in kilobytes, multiplied per-language.
+        sampleTestCases:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestCase"
+        solvedCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    ProblemInput:
+      type: object
+      required: [title, description, difficulty, points, cpuTimeLimitSeconds, memoryLimitKb]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        difficulty:
+          $ref: "#/components/schemas/ProblemDifficulty"
+        points:
+          type: integer
+          minimum: 0
+        tags:
+          type: array
+          items:
+            type: string
+        cpuTimeLimitSeconds:
+          type: number
+          minimum: 0.1
+        memoryLimitKb:
+          type: integer
+          minimum: 1024
+
+    ProblemUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        difficulty:
+          $ref: "#/components/schemas/ProblemDifficulty"
+        points:
+          type: integer
+          minimum: 0
+        tags:
+          type: array
+          items:
+            type: string
+        cpuTimeLimitSeconds:
+          type: number
+          minimum: 0.1
+        memoryLimitKb:
+          type: integer
+          minimum: 1024
+
+    TestCase:
+      type: object
+      required: [id, problemId, stdin, expectedOutput, isSample, points, orderIndex]
+      properties:
+        id:
+          type: integer
+        problemId:
+          type: integer
+        stdin:
+          type: string
+        expectedOutput:
+          type: string
+        isSample:
+          type: boolean
+        points:
+          type: integer
+        orderIndex:
+          type: integer
+
+    TestCaseInput:
+      type: object
+      required: [stdin, expectedOutput, isSample, points]
+      properties:
+        stdin:
+          type: string
+        expectedOutput:
+          type: string
+        isSample:
+          type: boolean
+        points:
+          type: integer
+          minimum: 0
+
+    SubmissionStatus:
+      type: string
+      enum:
+        - queued
+        - judging
+        - accepted
+        - partial
+        - wrong_answer
+        - time_limit_exceeded
+        - memory_limit_exceeded
+        - runtime_error
+        - compilation_error
+        - internal_error
+
+    TestResultStatus:
+      type: string
+      enum:
+        - queued
+        - processing
+        - accepted
+        - wrong_answer
+        - time_limit_exceeded
+        - memory_limit_exceeded
+        - runtime_error
+        - compilation_error
+        - internal_error
+
+    SubmissionTestResult:
+      type: object
+      required: [id, testCaseId, status, isSample, points, earnedPoints]
+      properties:
+        id:
+          type: integer
+        testCaseId:
+          type: integer
+        status:
+          $ref: "#/components/schemas/TestResultStatus"
+        isSample:
+          type: boolean
+        points:
+          type: integer
+        earnedPoints:
+          type: integer
+        timeMs:
+          type: [number, 'null']
+        memoryKb:
+          type: [integer, 'null']
+        stdout:
+          type: [string, 'null']
+        stderr:
+          type: [string, 'null']
+        compileOutput:
+          type: [string, 'null']
+
+    SubmissionInput:
+      type: object
+      required: [problemId, languageId, sourceCode]
+      properties:
+        problemId:
+          type: integer
+        contestId:
+          type: [integer, 'null']
+        languageId:
+          type: integer
+        sourceCode:
+          type: string
+          minLength: 1
+
+    SubmissionSummary:
+      type: object
+      required: [id, problemId, problemTitle, languageId, languageName, status, score, maxScore, submittedAt]
+      properties:
+        id:
+          type: integer
+        problemId:
+          type: integer
+        problemTitle:
+          type: string
+        contestId:
+          type: [integer, 'null']
+        languageId:
+          type: integer
+        languageName:
+          type: string
+        status:
+          $ref: "#/components/schemas/SubmissionStatus"
+        score:
+          type: integer
+        maxScore:
+          type: integer
+        submittedAt:
+          type: string
+          format: date-time
+
+    Submission:
+      type: object
+      required: [id, problemId, problemTitle, languageId, languageName, sourceCode, status, score, maxScore, submittedAt, testResults]
+      properties:
+        id:
+          type: integer
+        problemId:
+          type: integer
+        problemTitle:
+          type: string
+        contestId:
+          type: [integer, 'null']
+        languageId:
+          type: integer
+        languageName:
+          type: string
+        sourceCode:
+          type: string
+        status:
+          $ref: "#/components/schemas/SubmissionStatus"
+        score:
+          type: integer
+        maxScore:
+          type: integer
+        submittedAt:
+          type: string
+          format: date-time
+        judgedAt:
+          type: [string, 'null']
+          format: date-time
+        testResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubmissionTestResult"
+
+    Judge0CallbackPayload:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+        stdout:
+          type: [string, 'null']
+        stderr:
+          type: [string, 'null']
+        compile_output:
+          type: [string, 'null']
+        message:
+          type: [string, 'null']
+        time:
+          type: [string, 'null']
+        memory:
+          type: [number, 'null']
+        status:
+          type: object
+          properties:
+            id:
+              type: integer
+            description:
+              type: string
+
+    ContestProblem:
+      type: object
+      required: [problemId, title, difficulty, points, label]
+      properties:
+        problemId:
+          type: integer
+        title:
+          type: string
+        difficulty:
+          $ref: "#/components/schemas/ProblemDifficulty"
+        points:
+          type: integer
+        label:
+          type: string
+
+    ContestSummary:
+      type: object
+      required: [id, slug, title, description, startTime, endTime, problemCount]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        problemCount:
+          type: integer
+
+    Contest:
+      type: object
+      required: [id, slug, title, description, startTime, endTime, problems]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        problems:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContestProblem"
+
+    ContestProblemInput:
+      type: object
+      required: [problemId, points, label]
+      properties:
+        problemId:
+          type: integer
+        points:
+          type: integer
+          minimum: 0
+        label:
+          type: string
+
+    ContestInput:
+      type: object
+      required: [title, description, startTime, endTime, problems]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        problems:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContestProblemInput"
+
+    LeaderboardEntry:
+      type: object
+      required: [rank, userId, username, profileImageUrl, totalScore, solvedCount, penaltyMinutes, lastAcceptedAt]
+      properties:
+        rank:
+          type: integer
+        userId:
+          type: string
+        username:
+          type: string
+        profileImageUrl:
+          type: [string, 'null']
+        totalScore:
+          type: integer
+        solvedCount:
+          type: integer
+        penaltyMinutes:
+          type: integer
+        lastAcceptedAt:
+          type: [string, 'null']
+          format: date-time
+
+    DashboardSummary:
+      type: object
+      required: [solvedCount, totalSubmissions, acceptanceRate, recentSubmissions]
+      properties:
+        solvedCount:
+          type: integer
+        totalSubmissions:
+          type: integer
+        acceptanceRate:
+          type: number
+        recentSubmissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubmissionSummary"
