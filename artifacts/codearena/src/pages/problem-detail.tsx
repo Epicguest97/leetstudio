@@ -10,7 +10,6 @@ import {
   getGetSubmissionQueryKey,
 } from "@workspace/api-client-react";
 import type { SubmissionTestResult } from "@workspace/api-client-react";
-import { useAuth } from "@workspace/replit-auth-web";
 import { Loader2, CheckCircle2, XCircle, Clock, AlertTriangle, X, ChevronDown, ChevronUp } from "lucide-react";
 
 // ── VS Code colors ──────────────────────────────────────────────────────────
@@ -397,7 +396,6 @@ export default function ProblemDetail() {
   const { id } = useParams<{ id: string }>();
   const problemId = Number(id);
 
-  const { isAuthenticated, login } = useAuth();
   const { data: problem, isLoading } = useGetProblem(problemId, {
     query: { enabled: !!problemId, queryKey: getGetProblemQueryKey(problemId) },
   });
@@ -457,7 +455,7 @@ export default function ProblemDetail() {
 
   // Terminal prompt
   const problemSlug = problem ? problem.title.toLowerCase().replace(/\s+/g, "-") : "problem";
-  const prompt = `~/codearena/${problemSlug}$ `;
+  const prompt = `~/leetstudio/${problemSlug}$ `;
 
   // Update hint in terminal when tab or problem changes
   useEffect(() => {
@@ -466,7 +464,7 @@ export default function ProblemDetail() {
     const filename = meta.filenameFn(problemSlug);
     const cmd = meta.runCommand(filename);
     setTermLines([
-      { type: "output", text: "Welcome to CodeArena terminal.", color: C.termDim },
+      { type: "output", text: "Welcome to LeetStudio terminal.", color: C.termDim },
       { type: "output", text: `Run command: ${cmd}`, color: C.termDim },
       { type: "output", text: "" },
     ]);
@@ -500,17 +498,6 @@ export default function ProblemDetail() {
         { type: "output", text: "  clear    — clear the terminal" },
         { type: "output", text: "" },
       ]);
-      return;
-    }
-
-    // Check auth
-    if (!isAuthenticated) {
-      setTermLines((prev) => [
-        ...prev,
-        { type: "output", text: "Error: you must be signed in to submit.", color: C.termRed },
-        { type: "output", text: "" },
-      ]);
-      login();
       return;
     }
 
@@ -570,7 +557,7 @@ export default function ProblemDetail() {
         },
       },
     );
-  }, [termInput, activeTab, isAuthenticated, login, codes, languages, problemId, problemSlug, createSubmission]);
+  }, [termInput, activeTab, codes, languages, problemId, problemSlug, createSubmission]);
 
   // ── Filenames ────────────────────────────────────────────────────────────
   const filenames = (["cpp", "python", "java"] as LangKey[]).reduce(
@@ -648,7 +635,7 @@ export default function ProblemDetail() {
           fontSize: 11, fontFamily: "JetBrains Mono", color: C.textDim, flexShrink: 0, userSelect: "none",
         }}
       >
-        <span>CodeArena</span><span style={{ opacity: 0.5 }}>›</span>
+        <span>LeetStudio</span><span style={{ opacity: 0.5 }}>›</span>
         <span>Problems</span><span style={{ opacity: 0.5 }}>›</span>
         <span style={{ color: C.text }}>{problem.id}. {problem.title}</span>
         <span style={{ opacity: 0.5 }}>›</span>

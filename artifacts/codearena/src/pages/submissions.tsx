@@ -1,6 +1,5 @@
 import { Link } from "wouter";
 import { useListSubmissions } from "@workspace/api-client-react";
-import { RequireAuth } from "@/components/require-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, XCircle, Clock, Activity, AlertCircle, ListChecks } from "lucide-react";
 import type { SubmissionStatus } from "@workspace/api-client-react";
@@ -25,11 +24,7 @@ function StatusIcon({ status }: { status: SubmissionStatus }) {
 }
 
 export default function Submissions() {
-  return (
-    <RequireAuth>
-      <SubmissionsContent />
-    </RequireAuth>
-  );
+  return <SubmissionsContent />;
 }
 
 function SubmissionsContent() {

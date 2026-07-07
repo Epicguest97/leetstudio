@@ -66,7 +66,7 @@ export default function Home() {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blueLight} strokeWidth="1.5">
               <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
             </svg>
-            <h1 style={{ fontSize: 26, fontWeight: 700, color: C.text, margin: 0 }}>CodeArena</h1>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: C.text, margin: 0 }}>LeetStudio</h1>
           </div>
           <p style={{ fontSize: 13, color: C.textDim, margin: 0, maxWidth: 480 }}>
             Pick a problem from the Explorer on the left, write your solution in the editor, and submit.

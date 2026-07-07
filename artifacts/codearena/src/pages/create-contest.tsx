@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useCreateContest, useListProblems } from "@workspace/api-client-react";
-import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,11 +22,7 @@ interface ProblemRow {
 }
 
 export default function CreateContest() {
-  return (
-    <RequireAuth>
-      <CreateContestContent />
-    </RequireAuth>
-  );
+  return <CreateContestContent />;
 }
 
 function CreateContestContent() {

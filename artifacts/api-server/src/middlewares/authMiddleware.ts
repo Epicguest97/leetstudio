@@ -1,14 +1,6 @@
-import * as oidc from "openid-client";
 import { type Request, type Response, type NextFunction } from "express";
 import type { AuthUser } from "@workspace/api-zod";
-import {
-  clearSession,
-  getOidcConfig,
-  getSessionId,
-  getSession,
-  updateSession,
-  type SessionData,
-} from "../lib/auth";
+import { db, usersTable } from "@workspace/db";
 
 declare global {
   namespace Express {
@@ -26,31 +18,46 @@ declare global {
   }
 }
 
-async function refreshIfExpired(
-  sid: string,
-  session: SessionData,
-): Promise<SessionData | null> {
-  const now = Math.floor(Date.now() / 1000);
-  if (!session.expires_at || now <= session.expires_at) return session;
+const LOCAL_USER_ID = process.env.LOCAL_USER_ID ?? "local-user";
 
-  if (!session.refresh_token) return null;
+const localUserSeed: AuthUser = {
+  id: LOCAL_USER_ID,
+  email: null,
+  firstName: "Local",
+  lastName: "User",
+  profileImageUrl: null,
+};
 
-  try {
-    const config = await getOidcConfig();
-    const tokens = await oidc.refreshTokenGrant(
-      config,
-      session.refresh_token,
-    );
-    session.access_token = tokens.access_token;
-    session.refresh_token = tokens.refresh_token ?? session.refresh_token;
-    session.expires_at = tokens.expiresIn()
-      ? now + tokens.expiresIn()!
-      : session.expires_at;
-    await updateSession(sid, session);
-    return session;
-  } catch {
-    return null;
+let localUserPromise: Promise<AuthUser> | null = null;
+
+async function getLocalUser(): Promise<AuthUser> {
+  if (!localUserPromise) {
+    localUserPromise = (async () => {
+      const [user] = await db
+        .insert(usersTable)
+        .values(localUserSeed)
+        .onConflictDoUpdate({
+          target: usersTable.id,
+          set: {
+            ...localUserSeed,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+
+      return (
+        user && {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          profileImageUrl: user.profileImageUrl,
+        }
+      ) ?? localUserSeed;
+    })();
   }
+
+  return localUserPromise;
 }
 
 export async function authMiddleware(
@@ -62,26 +69,6 @@ export async function authMiddleware(
     return this.user != null;
   } as Request["isAuthenticated"];
 
-  const sid = getSessionId(req);
-  if (!sid) {
-    next();
-    return;
-  }
-
-  const session = await getSession(sid);
-  if (!session?.user?.id) {
-    await clearSession(res, sid);
-    next();
-    return;
-  }
-
-  const refreshed = await refreshIfExpired(sid, session);
-  if (!refreshed) {
-    await clearSession(res, sid);
-    next();
-    return;
-  }
-
-  req.user = refreshed.user;
+  req.user = await getLocalUser();
   next();
 }

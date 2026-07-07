@@ -1,6 +1,5 @@
 import { useParams, Link } from "wouter";
 import { useGetSubmission, getGetSubmissionQueryKey } from "@workspace/api-client-react";
-import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import {
   CheckCircle2,
@@ -132,11 +131,7 @@ function TestResultRow({ result, index }: { result: SubmissionTestResult; index:
 }
 
 export default function SubmissionDetail() {
-  return (
-    <RequireAuth>
-      <SubmissionDetailContent />
-    </RequireAuth>
-  );
+  return <SubmissionDetailContent />;
 }
 
 function SubmissionDetailContent() {

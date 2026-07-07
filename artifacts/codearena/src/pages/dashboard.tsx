@@ -1,6 +1,5 @@
 import { Link } from "wouter";
 import { useGetDashboardSummary } from "@workspace/api-client-react";
-import { RequireAuth } from "@/components/require-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Trophy, CheckCircle2, XCircle, Clock, Activity, Code2, AlertCircle } from "lucide-react";
 import { SubmissionStatus } from "@workspace/api-client-react";
@@ -17,11 +16,7 @@ function StatusIcon({ status }: { status: SubmissionStatus }) {
 }
 
 export default function Dashboard() {
-  return (
-    <RequireAuth>
-      <DashboardContent />
-    </RequireAuth>
-  );
+  return <DashboardContent />;
 }
 
 function DashboardContent() {

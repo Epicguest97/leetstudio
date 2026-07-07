@@ -7,7 +7,6 @@ import {
   useCreateTestCase,
   useDeleteTestCase,
 } from "@workspace/api-client-react";
-import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,11 +24,7 @@ import { Plus, Trash2, CheckCircle2, Loader2 } from "lucide-react";
 import type { ProblemDifficulty } from "@workspace/api-client-react";
 
 export default function CreateProblem() {
-  return (
-    <RequireAuth>
-      <CreateProblemContent />
-    </RequireAuth>
-  );
+  return <CreateProblemContent />;
 }
 
 function CreateProblemContent() {
