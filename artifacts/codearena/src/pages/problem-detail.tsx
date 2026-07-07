@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "wouter";
 import Editor from "@monaco-editor/react";
 import {
@@ -11,30 +11,74 @@ import {
 } from "@workspace/api-client-react";
 import type { SubmissionTestResult } from "@workspace/api-client-react";
 import { useAuth } from "@workspace/replit-auth-web";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { CheckCircle2, XCircle, Clock, Play, Loader2, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Clock, AlertTriangle, X, ChevronDown, ChevronUp } from "lucide-react";
 
 // ── VS Code colors ──────────────────────────────────────────────────────────
 const C = {
   border:    "#404751",
   tabBar:    "#1e2020",
   activeTab: "#121414",
+  inactiveTab: "#2d2f2f",
   textDim:   "#c0c7d3",
   text:      "#e3e2e2",
   blue:      "#007acc",
   blueLight: "#9fcaff",
-  descBg:    "#121414",
   panelBg:   "#1a1c1c",
+  termBg:    "#0d0e0f",
+  termGreen: "#4ec994",
+  termRed:   "#e06c75",
+  termYellow:"#e5c07b",
+  termCyan:  "#56b6c2",
+  termDim:   "#6e7681",
+};
+
+// ── Language definitions ────────────────────────────────────────────────────
+type LangKey = "cpp" | "python" | "java";
+
+const LANG_META: Record<LangKey, {
+  label: string;
+  icon: React.ReactNode;
+  ext: string;
+  filenameFn: (slug: string) => string;
+  runCommand: (filename: string) => string;
+  monacoId: string;
+}> = {
+  cpp: {
+    label: "C++",
+    ext: "cpp",
+    monacoId: "cpp",
+    filenameFn: (s) => s.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join("_") + ".cpp",
+    runCommand: (f) => `g++ ${f} -o solution && ./solution`,
+    icon: (
+      <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "JetBrains Mono", color: "#56d8f5", lineHeight: 1 }}>
+        C+
+      </span>
+    ),
+  },
+  python: {
+    label: "Python",
+    ext: "py",
+    monacoId: "python",
+    filenameFn: (s) => s + ".py",
+    runCommand: (f) => `python3 ${f}`,
+    icon: (
+      <span style={{ fontSize: 11, lineHeight: 1 }}>🐍</span>
+    ),
+  },
+  java: {
+    label: "Java",
+    ext: "java",
+    monacoId: "java",
+    filenameFn: (s) => s.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join("") + ".java",
+    runCommand: (f) => `javac ${f} && java ${f.replace(".java", "")}`,
+    icon: (
+      <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "JetBrains Mono", color: "#f07178", lineHeight: 1 }}>J</span>
+    ),
+  },
 };
 
 // ── Starter templates ───────────────────────────────────────────────────────
-const STARTER: Record<string, string> = {
+const STARTER: Record<LangKey, string> = {
   cpp: `#include <bits/stdc++.h>
 using namespace std;
 
@@ -67,8 +111,6 @@ public class Main {
 }`,
 };
 
-const getStarter = (id: string) => STARTER[id] ?? "// write your solution here\n";
-
 // ── Minimal markdown renderer ───────────────────────────────────────────────
 function Markdown({ text }: { text: string }) {
   const paragraphs = text.split(/\n{2,}/);
@@ -98,7 +140,6 @@ function renderInline(line: string): React.ReactNode[] {
   });
 }
 
-// ── Difficulty badge ────────────────────────────────────────────────────────
 function DiffBadge({ d }: { d: string }) {
   const color = d === "easy" ? "#4ec994" : d === "medium" ? "#e5c07b" : "#e06c75";
   const bg    = d === "easy" ? "#4ec99420" : d === "medium" ? "#e5c07b20" : "#e06c7520";
@@ -106,62 +147,245 @@ function DiffBadge({ d }: { d: string }) {
   return <span style={{ color, background: bg, fontSize: 11, fontFamily: "JetBrains Mono", padding: "2px 7px", borderRadius: 2 }}>{label}</span>;
 }
 
-// ── Status badge ────────────────────────────────────────────────────────────
-const STATUS_LABEL: Record<string, string> = {
-  queued: "Queued", judging: "Judging", processing: "Judging",
-  accepted: "Accepted", partial: "Partial",
-  wrong_answer: "Wrong Answer", time_limit_exceeded: "Time Limit",
-  memory_limit_exceeded: "Memory Limit", runtime_error: "Runtime Error",
-  compilation_error: "Compile Error", internal_error: "Internal Error",
-};
+// ── Terminal line types ─────────────────────────────────────────────────────
+type TermLine =
+  | { type: "command"; text: string }
+  | { type: "output"; text: string; color?: string }
+  | { type: "blank" };
 
-function StatusBadge({ status }: { status: string }) {
-  const pending = status === "queued" || status === "judging" || status === "processing";
-  const good    = status === "accepted";
-  const partial = status === "partial";
-  const color   = pending ? "#9fcaff" : good ? "#4ec994" : partial ? "#e5c07b" : "#e06c75";
-  const bg      = pending ? "#9fcaff20" : good ? "#4ec99420" : partial ? "#e5c07b20" : "#e06c7520";
+function formatTestResults(results: SubmissionTestResult[], score: number, maxScore: number): TermLine[] {
+  const lines: TermLine[] = [];
+  const passed = results.filter((r) => r.status === "accepted").length;
+  lines.push({ type: "output", text: "" });
+  lines.push({ type: "output", text: `Running ${results.length} test case${results.length !== 1 ? "s" : ""}...` });
+  lines.push({ type: "output", text: "" });
+
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    const ok   = r.status === "accepted";
+    const icon = ok ? "✓" : "✗";
+    const label = ok ? "Accepted" : r.status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    const timing = r.timeMs != null ? ` [${r.timeMs}ms]` : "";
+    const pts    = `  ${r.earnedPoints}/${r.points} pts`;
+    const sampleTag = r.isSample ? " (sample)" : " (hidden)";
+    lines.push({
+      type: "output",
+      text: `  ${icon}  Test ${i + 1}${sampleTag}  ${label}${timing}${pts}`,
+      color: ok ? C.termGreen : C.termRed,
+    });
+    if (r.isSample && r.stdout) {
+      lines.push({ type: "output", text: `     stdout: ${r.stdout.trim()}`, color: C.termDim });
+    }
+    if (r.isSample && r.stderr) {
+      lines.push({ type: "output", text: `     stderr: ${r.stderr.trim()}`, color: C.termRed });
+    }
+    if (r.compileOutput) {
+      lines.push({ type: "output", text: `     compile: ${r.compileOutput.trim()}`, color: C.termYellow });
+    }
+  }
+
+  lines.push({ type: "output", text: "" });
+  const scoreColor = passed === results.length ? C.termGreen : passed > 0 ? C.termYellow : C.termRed;
+  lines.push({ type: "output", text: `  Score: ${passed}/${results.length} tests passed  |  ${score}/${maxScore} pts`, color: scoreColor });
+  lines.push({ type: "output", text: "" });
+  return lines;
+}
+
+// ── Tab bar for languages ───────────────────────────────────────────────────
+function LangTab({
+  langKey, filename, active, modified, onClick
+}: {
+  langKey: LangKey; filename: string; active: boolean; modified: boolean; onClick: () => void;
+}) {
+  const meta = LANG_META[langKey];
   return (
-    <span style={{ color, background: bg, display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px", borderRadius: 2, fontSize: 12, fontFamily: "JetBrains Mono" }}>
-      {pending ? <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} /> :
-       good    ? <CheckCircle2 size={12} /> :
-       partial ? <AlertTriangle size={12} /> :
-                 <XCircle size={12} />}
-      {STATUS_LABEL[status] ?? status}
-    </span>
+    <div
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "0 14px",
+        height: "100%",
+        background: active ? C.activeTab : C.inactiveTab,
+        borderTop: active ? `1px solid ${C.blue}` : "1px solid transparent",
+        borderRight: `1px solid ${C.border}`,
+        fontSize: 12,
+        color: active ? C.text : C.textDim,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        userSelect: "none",
+        flexShrink: 0,
+        transition: "background 0.1s, color 0.1s",
+        position: "relative",
+      }}
+      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#252727"; }}
+      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = C.inactiveTab; }}
+    >
+      <span style={{ display: "flex", alignItems: "center", width: 14, justifyContent: "center" }}>
+        {meta.icon}
+      </span>
+      <span>{filename}</span>
+      {modified && active && (
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.text, display: "inline-block", marginLeft: 2, flexShrink: 0 }} />
+      )}
+    </div>
   );
 }
 
-// ── Test result row ─────────────────────────────────────────────────────────
-function TestRow({ result, index }: { result: SubmissionTestResult; index: number }) {
-  const passed  = result.status === "accepted";
-  const pending = result.status === "queued" || result.status === "processing";
-  const color   = passed ? "#4ec994" : pending ? "#9fcaff" : "#e06c75";
+// ── Terminal ────────────────────────────────────────────────────────────────
+function Terminal({
+  lines,
+  prompt,
+  input,
+  onInput,
+  onEnter,
+  loading,
+  terminalOpen,
+  onToggle,
+  height,
+}: {
+  lines: TermLine[];
+  prompt: string;
+  input: string;
+  onInput: (v: string) => void;
+  onEnter: () => void;
+  loading: boolean;
+  terminalOpen: boolean;
+  onToggle: () => void;
+  height: number;
+}) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef  = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [lines]);
+
   return (
-    <div style={{ border: `1px solid ${C.border}`, borderRadius: 2, overflow: "hidden", fontSize: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 10px", background: "#222424" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, color }}>
-          {passed  ? <CheckCircle2 size={12} /> :
-           pending ? <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} /> :
-                     <XCircle size={12} />}
-          <span style={{ color: C.text }}>Test {index + 1}</span>
-          {result.isSample && <span style={{ color: C.textDim, fontSize: 11 }}>(sample)</span>}
+    <div
+      style={{
+        background: C.panelBg,
+        borderTop: `1px solid ${C.border}`,
+        display: "flex",
+        flexDirection: "column",
+        flexShrink: 0,
+      }}
+    >
+      {/* Terminal tab bar */}
+      <div
+        style={{
+          height: 30,
+          display: "flex",
+          alignItems: "center",
+          borderBottom: terminalOpen ? `1px solid ${C.border}` : "none",
+          userSelect: "none",
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "0 12px",
+            height: "100%",
+            borderRight: `1px solid ${C.border}`,
+            borderBottom: `1px solid ${C.blue}`,
+            fontSize: 11,
+            fontFamily: "JetBrains Mono",
+            color: C.text,
+            cursor: "pointer",
+            letterSpacing: "0.04em",
+          }}
+        >
+          TERMINAL
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, color: C.textDim, fontFamily: "JetBrains Mono", fontSize: 11 }}>
-          {result.timeMs != null && <span style={{ display: "flex", alignItems: "center", gap: 3 }}><Clock size={10} />{result.timeMs}ms</span>}
-          <span style={{ color: passed ? "#4ec994" : C.textDim }}>{result.earnedPoints}/{result.points} pts</span>
-        </div>
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={onToggle}
+          style={{ background: "transparent", border: "none", cursor: "pointer", color: C.textDim, padding: "4px 10px", display: "flex", alignItems: "center" }}
+        >
+          {terminalOpen ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+        </button>
+        {terminalOpen && (
+          <button
+            onClick={() => onInput("") }
+            style={{ background: "transparent", border: "none", cursor: "pointer", color: C.textDim, padding: "4px 10px", display: "flex", alignItems: "center" }}
+            title="Clear terminal"
+          >
+            <X size={13} />
+          </button>
+        )}
       </div>
-      {result.isSample && (result.stdout || result.stderr || result.compileOutput) && (
-        <div style={{ padding: "6px 10px", fontFamily: "JetBrains Mono", fontSize: 11, background: "#1a1c1c", display: "flex", flexDirection: "column", gap: 3 }}>
-          {result.compileOutput && <div><span style={{ color: C.textDim }}>compile: </span><span style={{ color: "#e06c75" }}>{result.compileOutput}</span></div>}
-          {result.stdout && <div><span style={{ color: C.textDim }}>stdout: </span><span>{result.stdout}</span></div>}
-          {result.stderr && <div><span style={{ color: C.textDim }}>stderr: </span><span style={{ color: "#e06c75" }}>{result.stderr}</span></div>}
-        </div>
-      )}
-      {!result.isSample && result.compileOutput && (
-        <div style={{ padding: "6px 10px", fontFamily: "JetBrains Mono", fontSize: 11, background: "#1a1c1c" }}>
-          <span style={{ color: C.textDim }}>compile: </span><span style={{ color: "#e06c75" }}>{result.compileOutput}</span>
+
+      {terminalOpen && (
+        <div
+          style={{ height, background: C.termBg, overflow: "hidden", display: "flex", flexDirection: "column", cursor: "text" }}
+          onClick={() => inputRef.current?.focus()}
+        >
+          {/* Output area */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px 4px", fontFamily: "JetBrains Mono", fontSize: 12, lineHeight: "18px" }}>
+            {lines.map((line, i) => {
+              if (line.type === "blank") return <div key={i} style={{ height: 6 }} />;
+              if (line.type === "command") return (
+                <div key={i} style={{ color: C.termGreen }}>
+                  <span style={{ color: C.termCyan }}>{prompt}</span>
+                  <span>{line.text}</span>
+                </div>
+              );
+              return (
+                <div key={i} style={{ color: line.color ?? C.text, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                  {line.text}
+                </div>
+              );
+            })}
+            {loading && (
+              <div style={{ color: C.termCyan, display: "flex", alignItems: "center", gap: 6 }}>
+                <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} />
+                Waiting for judge...
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input line */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              padding: "4px 12px 8px",
+              gap: 0,
+              fontFamily: "JetBrains Mono",
+              fontSize: 12,
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ color: C.termCyan, userSelect: "none", marginRight: 4 }}>{prompt}</span>
+            <input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => onInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onEnter();
+              }}
+              disabled={loading}
+              spellCheck={false}
+              autoComplete="off"
+              style={{
+                flex: 1,
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                color: C.text,
+                fontFamily: "JetBrains Mono",
+                fontSize: 12,
+                caretColor: C.text,
+                opacity: loading ? 0.5 : 1,
+              }}
+              placeholder={loading ? "" : "type a command..."}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -172,36 +396,40 @@ function TestRow({ result, index }: { result: SubmissionTestResult; index: numbe
 export default function ProblemDetail() {
   const { id } = useParams<{ id: string }>();
   const problemId = Number(id);
-  const contestId = useMemo(() => {
-    const v = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("contestId");
-    return v ? Number(v) : undefined;
-  }, []);
 
   const { isAuthenticated, login } = useAuth();
-
   const { data: problem, isLoading } = useGetProblem(problemId, {
     query: { enabled: !!problemId, queryKey: getGetProblemQueryKey(problemId) },
   });
   const { data: languages } = useListLanguages();
 
-  const [languageId, setLanguageId]   = useState<number | undefined>(undefined);
-  const [sourceCode, setSourceCode]   = useState("");
+  // ── Language tabs state ──────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<LangKey>("cpp");
+  const [codes, setCodes] = useState<Record<LangKey, string>>({
+    cpp:    STARTER.cpp,
+    python: STARTER.python,
+    java:   STARTER.java,
+  });
+  const [modified, setModified] = useState<Record<LangKey, boolean>>({
+    cpp: false, python: false, java: false,
+  });
+
+  const handleCodeChange = useCallback((v: string | undefined) => {
+    setCodes((prev) => ({ ...prev, [activeTab]: v ?? "" }));
+    setModified((prev) => ({ ...prev, [activeTab]: true }));
+  }, [activeTab]);
+
+  // ── Terminal state ───────────────────────────────────────────────────────
+  const [termLines, setTermLines] = useState<TermLine[]>([
+    { type: "output", text: "Welcome to CodeArena terminal.", color: C.termDim },
+    { type: "output", text: 'Type the run command to submit your solution.', color: C.termDim },
+    { type: "output", text: "" },
+  ]);
+  const [termInput, setTermInput] = useState("");
+  const [termOpen, setTermOpen]   = useState(true);
+
+  // ── Submission state ─────────────────────────────────────────────────────
   const [submissionId, setSubmissionId] = useState<number | undefined>(undefined);
-  const [panelOpen, setPanelOpen]     = useState(false);
-
-  const activeLanguage = languages?.find((l) => l.id === languageId) ?? languages?.[0];
-  const lastStarterRef = useRef("");
-
-  useEffect(() => {
-    if (!activeLanguage) return;
-    if (sourceCode === "" || sourceCode === lastStarterRef.current) {
-      const s = getStarter(activeLanguage.monacoId);
-      lastStarterRef.current = s;
-      setSourceCode(s);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeLanguage?.monacoId]);
-
   const createSubmission = useCreateSubmission();
 
   const { data: submission } = useGetSubmission(submissionId as number, {
@@ -215,49 +443,164 @@ export default function ProblemDetail() {
     },
   });
 
-  // Auto-open results panel on first submission
+  // When submission finishes, print results to terminal
+  const lastPrintedRef = useRef<number | undefined>(undefined);
   useEffect(() => {
-    if (submissionId) setPanelOpen(true);
-  }, [submissionId]);
+    if (!submission) return;
+    const done = submission.status !== "queued" && submission.status !== "judging";
+    if (done && lastPrintedRef.current !== submission.id) {
+      lastPrintedRef.current = submission.id;
+      const resultLines = formatTestResults(submission.testResults, submission.score, submission.maxScore);
+      setTermLines((prev) => [...prev, ...resultLines]);
+    }
+  }, [submission]);
 
-  const handleSubmit = () => {
-    const lid = languageId ?? languages?.[0]?.id;
-    if (!lid || !sourceCode.trim()) return;
+  // Terminal prompt
+  const problemSlug = problem ? problem.title.toLowerCase().replace(/\s+/g, "-") : "problem";
+  const prompt = `~/codearena/${problemSlug}$ `;
+
+  // Update hint in terminal when tab or problem changes
+  useEffect(() => {
+    if (!problem) return;
+    const meta = LANG_META[activeTab];
+    const filename = meta.filenameFn(problemSlug);
+    const cmd = meta.runCommand(filename);
+    setTermLines([
+      { type: "output", text: "Welcome to CodeArena terminal.", color: C.termDim },
+      { type: "output", text: `Run command: ${cmd}`, color: C.termDim },
+      { type: "output", text: "" },
+    ]);
+    setTermInput("");
+    setSubmissionId(undefined);
+    lastPrintedRef.current = undefined;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [problemId, activeTab]);
+
+  const handleTermEnter = useCallback(() => {
+    const cmd = termInput.trim();
+    if (!cmd) return;
+
+    setTermLines((prev) => [...prev, { type: "command", text: cmd }]);
+    setTermInput("");
+
+    // Clear command
+    if (cmd === "clear") {
+      setTermLines([]);
+      return;
+    }
+
+    // Help
+    if (cmd === "help") {
+      const meta = LANG_META[activeTab];
+      const filename = meta.filenameFn(problemSlug);
+      setTermLines((prev) => [
+        ...prev,
+        { type: "output", text: `Available commands:`, color: C.termCyan },
+        { type: "output", text: `  ${meta.runCommand(filename)}`, color: C.text },
+        { type: "output", text: "  clear    — clear the terminal" },
+        { type: "output", text: "" },
+      ]);
+      return;
+    }
+
+    // Check auth
+    if (!isAuthenticated) {
+      setTermLines((prev) => [
+        ...prev,
+        { type: "output", text: "Error: you must be signed in to submit.", color: C.termRed },
+        { type: "output", text: "" },
+      ]);
+      login();
+      return;
+    }
+
+    // Determine which language the command targets
+    let targetLang: LangKey | null = null;
+    if (cmd.includes(".cpp") || cmd.includes("g++") || cmd.includes("gcc")) targetLang = "cpp";
+    else if (cmd.includes(".py") || cmd.includes("python")) targetLang = "python";
+    else if (cmd.includes(".java") || cmd.includes("javac") || cmd.includes("java ")) targetLang = "java";
+
+    if (!targetLang) {
+      setTermLines((prev) => [
+        ...prev,
+        { type: "output", text: `bash: ${cmd.split(" ")[0]}: command not found`, color: C.termRed },
+        { type: "output", text: "Try 'help' to see available commands.", color: C.termDim },
+        { type: "output", text: "" },
+      ]);
+      return;
+    }
+
+    // Find the language ID
+    const monacoId = LANG_META[targetLang].monacoId;
+    const lang = languages?.find((l) => l.monacoId === monacoId);
+    if (!lang) {
+      setTermLines((prev) => [
+        ...prev,
+        { type: "output", text: `Language ${targetLang} is not available.`, color: C.termRed },
+        { type: "output", text: "" },
+      ]);
+      return;
+    }
+
+    const src = codes[targetLang];
+    if (!src.trim()) {
+      setTermLines((prev) => [
+        ...prev,
+        { type: "output", text: "Error: empty source file.", color: C.termRed },
+        { type: "output", text: "" },
+      ]);
+      return;
+    }
+
+    setTermLines((prev) => [
+      ...prev,
+      { type: "output", text: "" },
+    ]);
+
     createSubmission.mutate(
-      { data: { problemId, contestId: contestId ?? null, languageId: lid, sourceCode } },
-      { onSuccess: (d) => setSubmissionId(d.id) },
+      { data: { problemId, contestId: null, languageId: lang.id, sourceCode: src } },
+      {
+        onSuccess: (d) => setSubmissionId(d.id),
+        onError:   () => {
+          setTermLines((prev) => [
+            ...prev,
+            { type: "output", text: "Error: could not reach the judge. Try again.", color: C.termRed },
+            { type: "output", text: "" },
+          ]);
+        },
+      },
     );
-  };
+  }, [termInput, activeTab, isAuthenticated, login, codes, languages, problemId, problemSlug, createSubmission]);
 
-  // File extension for tab label
-  const extMap: Record<string, string> = { cpp: "cpp", python: "py", java: "java" };
-  const ext = extMap[activeLanguage?.monacoId ?? ""] ?? "txt";
-  const solutionFilename = problem
-    ? `${problem.title.toLowerCase().replace(/\s+/g, "-")}.${ext}`
-    : `solution.${ext}`;
+  // ── Filenames ────────────────────────────────────────────────────────────
+  const filenames = (["cpp", "python", "java"] as LangKey[]).reduce(
+    (acc, k) => ({ ...acc, [k]: LANG_META[k].filenameFn(problem ? problemSlug : "solution") }),
+    {} as Record<LangKey, string>,
+  );
 
-  // ── Loading ────────────────────────────────────────────────────────────
+  // ── Loading / not-found ──────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: C.textDim, gap: 8, fontFamily: "JetBrains Mono", fontSize: 13 }}>
-        <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Loading problem...
+        <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Loading...
       </div>
     );
   }
-
   if (!problem) {
     return (
-      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, color: C.textDim }}>
-        <span>Problem not found.</span>
+      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: C.textDim, fontSize: 13 }}>
+        Problem not found.
       </div>
     );
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────
+  const isJudging = submissionId != null && (submission?.status === "queued" || submission?.status === "judging" || !submission);
+
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-      {/* ── Tab bar ────────────────────────────────────────────────────── */}
+      {/* ── Tab bar (shared) ──────────────────────────────────────────────── */}
       <div
         style={{
           height: 35,
@@ -269,51 +612,60 @@ export default function ProblemDetail() {
           userSelect: "none",
         }}
       >
-        {/* Description tab */}
-        <Tab label="Problem Description" icon="doc" active={false} />
-        {/* Solution tab */}
-        <Tab label={solutionFilename} icon="code" active={true} />
+        {/* Description tab (pinned left) */}
+        <div
+          style={{
+            display: "flex", alignItems: "center", gap: 6, padding: "0 14px", height: "100%",
+            background: "transparent", borderTop: "1px solid transparent", borderRight: `1px solid ${C.border}`,
+            fontSize: 12, color: C.textDim, userSelect: "none", flexShrink: 0,
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
+            <path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5z" />
+            <polyline points="9.5 1 9.5 4.5 13 4.5" />
+          </svg>
+          Problem Description
+        </div>
+
+        {/* Language tabs */}
+        {(["cpp", "python", "java"] as LangKey[]).map((k) => (
+          <LangTab
+            key={k}
+            langKey={k}
+            filename={filenames[k]}
+            active={activeTab === k}
+            modified={modified[k]}
+            onClick={() => setActiveTab(k)}
+          />
+        ))}
       </div>
 
-      {/* ── Breadcrumb ──────────────────────────────────────────────────── */}
+      {/* ── Breadcrumb ───────────────────────────────────────────────────── */}
       <div
         style={{
-          height: 22,
-          background: "#1a1c1c",
-          borderBottom: `1px solid ${C.border}`,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 12px",
-          gap: 4,
-          fontSize: 11,
-          fontFamily: "JetBrains Mono",
-          color: C.textDim,
-          flexShrink: 0,
-          userSelect: "none",
+          height: 22, background: "#1a1c1c", borderBottom: `1px solid ${C.border}`,
+          display: "flex", alignItems: "center", padding: "0 12px", gap: 4,
+          fontSize: 11, fontFamily: "JetBrains Mono", color: C.textDim, flexShrink: 0, userSelect: "none",
         }}
       >
-        <span>CodeArena</span>
-        <span style={{ opacity: 0.5 }}>›</span>
-        <span>Problems</span>
-        <span style={{ opacity: 0.5 }}>›</span>
+        <span>CodeArena</span><span style={{ opacity: 0.5 }}>›</span>
+        <span>Problems</span><span style={{ opacity: 0.5 }}>›</span>
         <span style={{ color: C.text }}>{problem.id}. {problem.title}</span>
+        <span style={{ opacity: 0.5 }}>›</span>
+        <span style={{ color: C.blueLight }}>{filenames[activeTab]}</span>
       </div>
 
-      {/* ── Split pane ──────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      {/* ── Split pane ───────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0 }}>
 
         {/* LEFT: description (40%) */}
         <div
           style={{
-            width: "40%",
-            borderRight: `1px solid ${C.border}`,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-            background: C.descBg,
+            width: "40%", borderRight: `1px solid ${C.border}`,
+            display: "flex", flexDirection: "column", overflow: "hidden",
           }}
         >
-          {/* Problem header */}
+          {/* Header */}
           <div style={{ padding: "16px 20px 12px", borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
               <span style={{ fontSize: 17, fontWeight: 700, color: C.text }}>{problem.id}. {problem.title}</span>
@@ -329,10 +681,8 @@ export default function ProblemDetail() {
 
           {/* Scrollable description */}
           <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", fontSize: 13, color: C.text, lineHeight: 1.65 }}>
-
             <Markdown text={problem.description} />
 
-            {/* Sample test cases */}
             {problem.sampleTestCases.length > 0 && (
               <div style={{ marginTop: 20 }}>
                 {problem.sampleTestCases.map((tc, i) => (
@@ -340,14 +690,10 @@ export default function ProblemDetail() {
                     <p style={{ margin: "0 0 6px", fontWeight: 600, color: C.text }}>Example {i + 1}:</p>
                     <div style={{ background: "#1e2020", border: `1px solid ${C.border}`, borderRadius: 3, padding: "10px 12px", fontFamily: "JetBrains Mono", fontSize: 12 }}>
                       <div style={{ marginBottom: tc.expectedOutput ? 6 : 0 }}>
-                        <span style={{ color: C.textDim }}>Input: </span>
-                        <span>{tc.stdin || "(empty)"}</span>
+                        <span style={{ color: C.textDim }}>Input: </span><span>{tc.stdin || "(empty)"}</span>
                       </div>
                       {tc.expectedOutput && (
-                        <div>
-                          <span style={{ color: C.textDim }}>Output: </span>
-                          <span>{tc.expectedOutput}</span>
-                        </div>
+                        <div><span style={{ color: C.textDim }}>Output: </span><span>{tc.expectedOutput}</span></div>
                       )}
                     </div>
                   </div>
@@ -355,7 +701,6 @@ export default function ProblemDetail() {
               </div>
             )}
 
-            {/* Tags */}
             {problem.tags.length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
                 {problem.tags.map((t) => (
@@ -366,91 +711,18 @@ export default function ProblemDetail() {
           </div>
         </div>
 
-        {/* RIGHT: editor (60%) */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-
-          {/* Editor toolbar */}
-          <div
-            style={{
-              height: 36,
-              background: "#1a1c1c",
-              borderBottom: `1px solid ${C.border}`,
-              display: "flex",
-              alignItems: "center",
-              padding: "0 10px",
-              gap: 8,
-              flexShrink: 0,
-            }}
-          >
-            <Select
-              value={activeLanguage ? String(activeLanguage.id) : ""}
-              onValueChange={(v) => setLanguageId(Number(v))}
-            >
-              <SelectTrigger
-                style={{
-                  width: 160,
-                  height: 26,
-                  fontSize: 12,
-                  fontFamily: "JetBrains Mono",
-                  background: "#292a2a",
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 2,
-                  color: C.text,
-                }}
-              >
-                <SelectValue placeholder="Language" />
-              </SelectTrigger>
-              <SelectContent>
-                {languages?.map((lang) => (
-                  <SelectItem key={lang.id} value={String(lang.id)} style={{ fontFamily: "JetBrains Mono", fontSize: 12 }}>
-                    {lang.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <div style={{ flex: 1 }} />
-
-            {/* Submit / Sign in */}
-            {!isAuthenticated ? (
-              <button
-                onClick={login}
-                style={{
-                  background: C.blue, color: "#fff", border: "none", cursor: "pointer",
-                  padding: "4px 14px", borderRadius: 2, fontSize: 12, fontWeight: 600,
-                  fontFamily: "'Hanken Grotesk', sans-serif",
-                }}
-              >
-                Sign in to submit
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={createSubmission.isPending || !sourceCode.trim()}
-                style={{
-                  background: createSubmission.isPending ? "#005a9e" : C.blue,
-                  color: "#fff", border: "none", cursor: createSubmission.isPending ? "not-allowed" : "pointer",
-                  padding: "4px 14px", borderRadius: 2, fontSize: 12, fontWeight: 600,
-                  display: "flex", alignItems: "center", gap: 5,
-                  fontFamily: "'Hanken Grotesk', sans-serif",
-                  opacity: (!sourceCode.trim()) ? 0.5 : 1,
-                }}
-              >
-                {createSubmission.isPending
-                  ? <><Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} /> Submitting…</>
-                  : <><Play size={12} /> Submit</>}
-              </button>
-            )}
-          </div>
+        {/* RIGHT: editor + terminal */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
 
           {/* Monaco editor */}
-          <div style={{ flex: 1, overflow: "hidden" }}>
+          <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
             <Editor
+              key={activeTab}
               height="100%"
               theme="vs-dark"
-              language={activeLanguage?.monacoId ?? "plaintext"}
-              value={sourceCode}
-              onChange={(v: string | undefined) => setSourceCode(v ?? "")}
+              language={LANG_META[activeTab].monacoId}
+              value={codes[activeTab]}
+              onChange={handleCodeChange}
               options={{
                 fontSize: 13,
                 lineHeight: 20,
@@ -466,86 +738,20 @@ export default function ProblemDetail() {
             />
           </div>
 
-          {/* Bottom results panel */}
-          {submission && (
-            <div
-              style={{
-                background: C.panelBg,
-                borderTop: `1px solid ${C.border}`,
-                flexShrink: 0,
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              {/* Panel tab bar */}
-              <div
-                style={{
-                  height: 30,
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "0 12px",
-                  borderBottom: `1px solid ${C.border}`,
-                  userSelect: "none",
-                }}
-              >
-                <span style={{ fontSize: 11, fontFamily: "JetBrains Mono", color: C.textDim, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                  Test Results
-                </span>
-                <div style={{ flex: 1 }} />
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 8 }}>
-                  <StatusBadge status={submission.status} />
-                  <span style={{ fontSize: 11, fontFamily: "JetBrains Mono", color: C.textDim }}>
-                    {submission.score} / {submission.maxScore} pts
-                  </span>
-                </div>
-                <button
-                  onClick={() => setPanelOpen((v) => !v)}
-                  style={{ background: "transparent", border: "none", cursor: "pointer", color: C.textDim, display: "flex", padding: 2 }}
-                >
-                  {panelOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                </button>
-              </div>
-
-              {panelOpen && (
-                <div style={{ maxHeight: 220, overflowY: "auto", padding: "8px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
-                  {submission.testResults.map((r, i) => (
-                    <TestRow key={r.id} result={r} index={i} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          {/* Terminal */}
+          <Terminal
+            lines={termLines}
+            prompt={prompt}
+            input={termInput}
+            onInput={setTermInput}
+            onEnter={handleTermEnter}
+            loading={createSubmission.isPending || isJudging}
+            terminalOpen={termOpen}
+            onToggle={() => setTermOpen((v) => !v)}
+            height={termOpen ? 200 : 0}
+          />
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── Tab component ───────────────────────────────────────────────────────────
-function Tab({ label, icon, active }: { label: string; icon: "doc" | "code"; active: boolean }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "0 14px",
-        height: "100%",
-        background: active ? C.activeTab : "transparent",
-        borderTop: active ? `1px solid ${C.blue}` : "1px solid transparent",
-        borderRight: `1px solid ${C.border}`,
-        fontSize: 12,
-        color: active ? C.text : C.textDim,
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-        userSelect: "none",
-        flexShrink: 0,
-      }}
-    >
-      {icon === "doc"
-        ? <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5z"/><polyline points="9.5 1 9.5 4.5 13 4.5"/></svg>
-        : <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke={active ? C.blueLight : C.textDim} strokeWidth="1.3"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5z"/><polyline points="9.5 1 9.5 4.5 13 4.5"/></svg>}
-      <span>{label}</span>
     </div>
   );
 }
