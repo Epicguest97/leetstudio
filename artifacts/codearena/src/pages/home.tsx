@@ -1,86 +1,135 @@
-import { useState } from "react";
 import { Link } from "wouter";
 import { useListProblems } from "@workspace/api-client-react";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, ChevronRight } from "lucide-react";
-import { ProblemDifficulty } from "@workspace/api-client-react";
 
-function DifficultyBadge({ difficulty }: { difficulty: string }) {
-  if (difficulty === "easy")
-    return <Badge variant="secondary" className="bg-green-500/10 text-green-500 hover:bg-green-500/20">Easy</Badge>;
-  if (difficulty === "medium")
-    return <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20">Medium</Badge>;
-  if (difficulty === "hard")
-    return <Badge variant="secondary" className="bg-red-500/10 text-red-500 hover:bg-red-500/20">Hard</Badge>;
-  return <Badge variant="outline">{difficulty}</Badge>;
+const C = {
+  border:   "#404751",
+  textDim:  "#c0c7d3",
+  blue:     "#007acc",
+  blueLight:"#9fcaff",
+  text:     "#e3e2e2",
+  rowHover: "#1e2020",
+};
+
+function DiffPill({ d }: { d: string }) {
+  const color = d === "easy" ? "#4ec994" : d === "medium" ? "#e5c07b" : "#e06c75";
+  const bg    = d === "easy" ? "#4ec99420" : d === "medium" ? "#e5c07b20" : "#e06c7520";
+  const label = d === "easy" ? "Easy" : d === "medium" ? "Medium" : "Hard";
+  return (
+    <span style={{ color, background: bg, fontSize: 11, fontFamily: "JetBrains Mono", padding: "1px 6px", borderRadius: 2 }}>
+      {label}
+    </span>
+  );
 }
 
 export default function Home() {
-  const [filter, setFilter] = useState<ProblemDifficulty | "all">("all");
-  const { data: problems, isLoading } = useListProblems(
-    filter === "all" ? undefined : { difficulty: filter }
-  );
+  const { data: problems, isLoading } = useListProblems();
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-3xl">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Problems</h1>
-        <div className="flex p-1 bg-muted rounded-md">
-          {(["all", "easy", "medium", "hard"] as const).map((level) => (
-            <button
-              key={level}
-              onClick={() => setFilter(level)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-sm capitalize transition-all ${
-                filter === level
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {level === "all" ? "All" : level.charAt(0).toUpperCase() + level.slice(1)}
-            </button>
-          ))}
-        </div>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+      {/* Breadcrumb / tab bar */}
+      <div
+        style={{
+          height: 35,
+          background: "#1e2020",
+          borderBottom: `1px solid ${C.border}`,
+          display: "flex",
+          alignItems: "center",
+          padding: "0 16px",
+          flexShrink: 0,
+          fontSize: 12,
+          color: C.textDim,
+          fontFamily: "JetBrains Mono",
+          gap: 6,
+          userSelect: "none",
+        }}
+      >
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke={C.blueLight} strokeWidth="1.3">
+          <path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5z" />
+          <polyline points="9.5 1 9.5 4.5 13 4.5" />
+        </svg>
+        <span>Welcome</span>
       </div>
 
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
-          ))}
+      {/* Content */}
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+
+        {/* Hero */}
+        <div
+          style={{
+            padding: "40px 48px 24px",
+            borderBottom: `1px solid ${C.border}`,
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blueLight} strokeWidth="1.5">
+              <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: C.text, margin: 0 }}>CodeArena</h1>
+          </div>
+          <p style={{ fontSize: 13, color: C.textDim, margin: 0, maxWidth: 480 }}>
+            Pick a problem from the Explorer on the left, write your solution in the editor, and submit.
+          </p>
         </div>
-      ) : !problems?.length ? (
-        <p className="text-center text-muted-foreground py-16">No problems found.</p>
-      ) : (
-        <div className="space-y-2">
-          {problems.map((problem) => (
-            <Link key={problem.id} href={`/problems/${problem.id}`}>
-              <div className="group flex items-center justify-between p-4 bg-card border border-border rounded-lg hover:border-primary transition-colors cursor-pointer">
-                <div className="flex-1 min-w-0 pr-4">
-                  <div className="flex items-center gap-3 mb-0.5">
-                    <span className="font-medium group-hover:text-primary transition-colors truncate">
-                      {problem.id}. {problem.title}
-                    </span>
-                    <DifficultyBadge difficulty={problem.difficulty} />
+
+        {/* Problem table */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 0 24px" }}>
+
+          {/* Table header */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "48px 1fr 90px 70px 70px",
+              padding: "6px 48px",
+              fontSize: 11,
+              fontFamily: "JetBrains Mono",
+              color: C.textDim,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              borderBottom: `1px solid ${C.border}`,
+              position: "sticky",
+              top: 0,
+              background: "#121414",
+            }}
+          >
+            <span>#</span>
+            <span>Title</span>
+            <span>Difficulty</span>
+            <span style={{ textAlign: "right" }}>Points</span>
+            <span style={{ textAlign: "right" }}>Solved</span>
+          </div>
+
+          {isLoading
+            ? Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} style={{ height: 40, margin: "2px 48px", background: "#1e2020", borderRadius: 2, animation: "pulse 1.5s ease-in-out infinite" }} />
+              ))
+            : problems?.map((p) => (
+                <Link key={p.id} href={`/problems/${p.id}`}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "48px 1fr 90px 70px 70px",
+                      padding: "8px 48px",
+                      cursor: "pointer",
+                      borderBottom: `1px solid #1e2020`,
+                      transition: "background 0.1s",
+                      fontSize: 13,
+                      color: C.text,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = C.rowHover)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <span style={{ color: C.textDim, fontFamily: "JetBrains Mono", fontSize: 12 }}>{p.id}</span>
+                    <span style={{ fontWeight: 500 }}>{p.title}</span>
+                    <span><DiffPill d={p.difficulty} /></span>
+                    <span style={{ textAlign: "right", color: C.textDim, fontFamily: "JetBrains Mono", fontSize: 12 }}>{p.points}</span>
+                    <span style={{ textAlign: "right", color: C.textDim, fontFamily: "JetBrains Mono", fontSize: 12 }}>{p.solvedCount}</span>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      {problem.solvedCount} solved
-                    </span>
-                    <span>{problem.points} pts</span>
-                    {problem.tags.slice(0, 3).map((tag) => (
-                      <span key={tag} className="px-1.5 py-0.5 bg-accent text-accent-foreground rounded-sm">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-              </div>
-            </Link>
-          ))}
+                </Link>
+              ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }
