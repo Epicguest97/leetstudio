@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useParams, Link } from "wouter";
 import Editor from "@monaco-editor/react";
 import {
@@ -166,6 +166,42 @@ function TestResultRow({ result, index }: { result: SubmissionTestResult; index:
   );
 }
 
+const STARTER_CODE: Record<string, string> = {
+  cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    ios_base::sync_with_stdio(false);
+    cin.tie(NULL);
+    
+    // Write your solution here
+    
+    return 0;
+}`,
+  python: `import sys
+input = sys.stdin.readline
+
+def solve():
+    # Write your solution here
+    pass
+
+solve()`,
+  java: `import java.util.*;
+import java.io.*;
+
+public class Main {
+    public static void main(String[] args) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        // Write your solution here
+        
+    }
+}`,
+};
+
+function getStarter(monacoId: string): string {
+  return STARTER_CODE[monacoId] ?? "// Write your solution here\n";
+}
+
 export default function ProblemDetail() {
   const { id } = useParams<{ id: string }>();
   const problemId = Number(id);
@@ -187,6 +223,20 @@ export default function ProblemDetail() {
   const [submissionId, setSubmissionId] = useState<number | undefined>(undefined);
 
   const activeLanguage = languages?.find((l) => l.id === languageId) ?? languages?.[0];
+
+  // Track the previous starter so we can detect unmodified code on language switch
+  const lastStarterRef = useRef("");
+
+  // When languages first load, seed the editor with the default language's starter
+  useEffect(() => {
+    if (!activeLanguage) return;
+    if (sourceCode === "" || sourceCode === lastStarterRef.current) {
+      const starter = getStarter(activeLanguage.monacoId);
+      lastStarterRef.current = starter;
+      setSourceCode(starter);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLanguage?.monacoId]);
 
   const createSubmission = useCreateSubmission();
 
