@@ -1,13 +1,10 @@
 {
   "cleanUrls": true,
+  "outputDirectory": "artifacts/codearena/dist/public",
   "rewrites": [
     {
-      "source": "/assets/(.*)",
-      "destination": "/artifacts/codearena/dist/public/assets/$1"
-    },
-    {
       "source": "/(.*)",
-      "destination": "/artifacts/codearena/dist/public/index.html"
+      "destination": "/index.html"
     }
   ]
 }
