@@ -1,10 +1,10 @@
 import { integer, pgEnum, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { usersTable } from "./auth";
-import { problemsTable } from "./problems";
-import { contestsTable } from "./contests";
-import { languagesTable } from "./languages";
+import { usersTable } from "./auth.js";
+import { problemsTable } from "./problems.js";
+import { contestsTable } from "./contests.js";
+import { languagesTable } from "./languages.js";
 
 export const submissionStatusEnum = pgEnum("submission_status", [
   "queued",

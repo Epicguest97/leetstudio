@@ -1,8 +1,8 @@
 import { integer, pgEnum, pgTable, real, serial, text, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { submissionsTable } from "./submissions";
-import { testCasesTable } from "./testCases";
+import { submissionsTable } from "./submissions.js";
+import { testCasesTable } from "./testCases.js";
 
 export const testResultStatusEnum = pgEnum("test_result_status", [
   "queued",

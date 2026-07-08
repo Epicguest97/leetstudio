@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import * as schema from "./schema";
-import { initializeLocalDatabase } from "./local-bootstrap";
+import * as schema from "./schema/index.js";
+import { initializeLocalDatabase } from "./local-bootstrap.js";
 
 const { Pool } = pg;
 const databaseUrl = process.env.DATABASE_URL?.trim();
@@ -13,4 +13,4 @@ export const db = databaseUrl
       ? (() => { throw new Error("DATABASE_URL environment variable is required on Vercel but is not set."); })()
       : await initializeLocalDatabase());
 
-export * from "./schema";
+export * from "./schema/index.js";

@@ -1,8 +1,8 @@
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { contestsTable } from "./contests";
-import { problemsTable } from "./problems";
+import { contestsTable } from "./contests.js";
+import { problemsTable } from "./problems.js";
 
 export const contestProblemsTable = pgTable("contest_problems", {
   id: serial("id").primaryKey(),
