@@ -1552,19 +1552,10 @@ Explanation: "ace" is a common subsequence of length 3.`,
   },
 ];
 
-export async function initializeLocalDatabase() {
-  await fs.mkdir(path.dirname(localDatabasePath), { recursive: true });
-
-  const client = new PGlite(localDatabasePath);
-  const localDb = drizzle(client, { schema });
-
-  for (const statement of schemaStatements) {
-    await localDb.execute(sql.raw(statement));
-  }
-
+export async function seedProblemsAndLanguages(localDb: any) {
   for (const language of seedLanguages) {
     const existingLanguage = await localDb.query.languagesTable.findFirst({
-      where: (languageRow) => eq(languageRow.judge0Id, language.judge0Id),
+      where: (languageRow: any) => eq(languageRow.judge0Id, language.judge0Id),
     });
 
     if (!existingLanguage) {
@@ -1574,7 +1565,7 @@ export async function initializeLocalDatabase() {
 
   for (const { problem, testCases } of seedProblems) {
     const existingProblem = await localDb.query.problemsTable.findFirst({
-      where: (problemRow) => eq(problemRow.slug, problem.slug),
+      where: (problemRow: any) => eq(problemRow.slug, problem.slug),
     });
 
     if (existingProblem) {
@@ -1587,6 +1578,19 @@ export async function initializeLocalDatabase() {
       await localDb.insert(schema.testCasesTable).values({ problemId: insertedProblem.id, ...testCase });
     }
   }
+}
+
+export async function initializeLocalDatabase() {
+  await fs.mkdir(path.dirname(localDatabasePath), { recursive: true });
+
+  const client = new PGlite(localDatabasePath);
+  const localDb = drizzle(client, { schema });
+
+  for (const statement of schemaStatements) {
+    await localDb.execute(sql.raw(statement));
+  }
+
+  await seedProblemsAndLanguages(localDb);
 
   return localDb;
 }
