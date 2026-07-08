@@ -1,2 +1,1 @@
-# Ignore backend api-server completely when deploying the UI
-artifacts/api-server
+# Empty - backend is no longer ignored

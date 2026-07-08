@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import * as schema from "./schema";
 
-const localDatabasePath = process.env.LEETSTUDIO_DB_PATH ?? path.join(process.cwd(), ".local", "leetstudio-db");
+const localDatabasePath = process.env.VERCEL ? "/tmp/leetstudio-db" : (process.env.LEETSTUDIO_DB_PATH ?? path.join(process.cwd(), ".local", "leetstudio-db"));
 
 const enumStatements = [
   `DO $$ BEGIN CREATE TYPE problem_difficulty AS ENUM ('easy', 'medium', 'hard'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
