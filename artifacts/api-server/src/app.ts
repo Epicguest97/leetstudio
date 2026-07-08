@@ -42,7 +42,7 @@ app.use("/api", router);
 
 const publicDir = path.join(dirname, "../../codearena/dist/public");
 app.use(express.static(publicDir));
-app.get("/(.*)", (req, res) => {
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(publicDir, "index.html"));
 });
 
