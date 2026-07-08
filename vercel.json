@@ -3,10 +3,6 @@
   "outputDirectory": "artifacts/codearena/dist/public",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/artifacts/api-server/api/index.js"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
