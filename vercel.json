@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "outputDirectory": "artifacts/codearena/dist/public",
   "functions": {
     "api/index.js": {
       "includeFiles": "artifacts/codearena/dist/public/**"
