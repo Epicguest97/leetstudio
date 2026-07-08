@@ -1,31 +1,14 @@
 {
   "version": 2,
-  "cleanUrls": true,
-  "builds": [
-    {
-      "src": "api/index.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "artifacts/codearena/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist/public"
-      }
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "artifacts/codearena/dist/public/**"
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "api/index.js"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "/artifacts/codearena/dist/public/assets/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/artifacts/codearena/dist/public/index.html"
+      "source": "/(.*)",
+      "destination": "/api/index.js"
     }
   ]
 }
