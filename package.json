@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "sh -c 'PORT=3000 npm run dev --workspace @workspace/api-server & npm run dev --workspace @workspace/codearena & wait'",
     "dev:codebox": "JUDGE0_API_URL=http://localhost:5000 npm run dev",
-    "build": "npm run typecheck && npm run build --workspaces --if-present",
+    "build": "npm run typecheck && npm run build --workspaces --if-present && mkdir -p api && cp -r artifacts/api-server/dist/* api/",
     "typecheck:libs": "tsc --build",
     "typecheck": "npm run typecheck:libs && npm run typecheck --workspaces --if-present"
   },

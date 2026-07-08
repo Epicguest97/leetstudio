@@ -46,3 +46,7 @@ Thumbs.db
 
 .cache/
 .local/
+
+# compiled serverless files
+api/*.mjs
+api/*.map
