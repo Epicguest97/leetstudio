@@ -10,7 +10,14 @@ import {
   getGetSubmissionQueryKey,
 } from "@workspace/api-client-react";
 import type { SubmissionTestResult } from "@workspace/api-client-react";
-import { Loader2, CheckCircle2, XCircle, Clock, AlertTriangle, X, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  VscLoading,
+  VscClose,
+  VscChevronDown,
+  VscChevronUp,
+  VscCode,
+  VscBook,
+} from "react-icons/vsc";
 
 // ── VS Code colors ──────────────────────────────────────────────────────────
 const C = {
@@ -48,11 +55,7 @@ const LANG_META: Record<LangKey, {
     monacoId: "cpp",
     filenameFn: (s) => s.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join("_") + ".cpp",
     runCommand: (f) => `g++ ${f} -o solution && ./solution`,
-    icon: (
-      <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "JetBrains Mono", color: "#56d8f5", lineHeight: 1 }}>
-        C+
-      </span>
-    ),
+    icon: <VscCode size={13} style={{ color: "#56d8f5" }} />,
   },
   python: {
     label: "Python",
@@ -60,9 +63,7 @@ const LANG_META: Record<LangKey, {
     monacoId: "python",
     filenameFn: (s) => s + ".py",
     runCommand: (f) => `python3 ${f}`,
-    icon: (
-      <span style={{ fontSize: 11, lineHeight: 1 }}>🐍</span>
-    ),
+    icon: <VscCode size={13} style={{ color: "#3572A5" }} />,
   },
   java: {
     label: "Java",
@@ -70,9 +71,7 @@ const LANG_META: Record<LangKey, {
     monacoId: "java",
     filenameFn: (s) => s.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join("") + ".java",
     runCommand: (f) => `javac ${f} && java ${f.replace(".java", "")}`,
-    icon: (
-      <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "JetBrains Mono", color: "#f07178", lineHeight: 1 }}>J</span>
-    ),
+    icon: <VscCode size={13} style={{ color: "#b07219" }} />,
   },
 };
 
@@ -305,7 +304,7 @@ function Terminal({
           onClick={onToggle}
           style={{ background: "transparent", border: "none", cursor: "pointer", color: C.textDim, padding: "4px 10px", display: "flex", alignItems: "center" }}
         >
-          {terminalOpen ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+          {terminalOpen ? <VscChevronDown size={13} /> : <VscChevronUp size={13} />}
         </button>
         {terminalOpen && (
           <button
@@ -313,7 +312,7 @@ function Terminal({
             style={{ background: "transparent", border: "none", cursor: "pointer", color: C.textDim, padding: "4px 10px", display: "flex", alignItems: "center" }}
             title="Clear terminal"
           >
-            <X size={13} />
+            <VscClose size={13} />
           </button>
         )}
       </div>
@@ -341,7 +340,7 @@ function Terminal({
             })}
             {loading && (
               <div style={{ color: C.termCyan, display: "flex", alignItems: "center", gap: 6 }}>
-                <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} />
+                <VscLoading size={11} style={{ animation: "spin 1s linear infinite" }} />
                 Waiting for judge...
               </div>
             )}
@@ -569,7 +568,7 @@ export default function ProblemDetail() {
   if (isLoading) {
     return (
       <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: C.textDim, gap: 8, fontFamily: "JetBrains Mono", fontSize: 13 }}>
-        <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Loading...
+        <VscLoading size={16} style={{ animation: "spin 1s linear infinite" }} /> Loading...
       </div>
     );
   }
@@ -607,10 +606,7 @@ export default function ProblemDetail() {
             fontSize: 12, color: C.textDim, userSelect: "none", flexShrink: 0,
           }}
         >
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
-            <path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5z" />
-            <polyline points="9.5 1 9.5 4.5 13 4.5" />
-          </svg>
+          <VscBook size={13} style={{ marginRight: 2 }} />
           Problem Description
         </div>
 
@@ -625,21 +621,6 @@ export default function ProblemDetail() {
             onClick={() => setActiveTab(k)}
           />
         ))}
-      </div>
-
-      {/* ── Breadcrumb ───────────────────────────────────────────────────── */}
-      <div
-        style={{
-          height: 22, background: "#1a1c1c", borderBottom: `1px solid ${C.border}`,
-          display: "flex", alignItems: "center", padding: "0 12px", gap: 4,
-          fontSize: 11, fontFamily: "JetBrains Mono", color: C.textDim, flexShrink: 0, userSelect: "none",
-        }}
-      >
-        <span>LeetStudio</span><span style={{ opacity: 0.5 }}>›</span>
-        <span>Problems</span><span style={{ opacity: 0.5 }}>›</span>
-        <span style={{ color: C.text }}>{problem.id}. {problem.title}</span>
-        <span style={{ opacity: 0.5 }}>›</span>
-        <span style={{ color: C.blueLight }}>{filenames[activeTab]}</span>
       </div>
 
       {/* ── Split pane ───────────────────────────────────────────────────── */}

@@ -3,10 +3,9 @@
   "version": "0.0.0",
   "license": "MIT",
   "workspaces": [
-    "artifacts/*",
-    "lib/*",
-    "lib/integrations/*",
-    "scripts"
+    "artifacts/api-server",
+    "artifacts/codearena",
+    "lib/*"
   ],
   "scripts": {
     "dev": "sh -c 'PORT=3000 npm run dev --workspace @workspace/api-server & npm run dev --workspace @workspace/codearena & wait'",

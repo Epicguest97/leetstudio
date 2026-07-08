@@ -2,14 +2,14 @@ import { useParams, Link } from "wouter";
 import { useGetSubmission, getGetSubmissionQueryKey } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import {
-  CheckCircle2,
-  XCircle,
-  Clock,
-  MemoryStick,
-  Loader2,
-  AlertTriangle,
-  ChevronLeft,
-} from "lucide-react";
+  VscCheck,
+  VscError,
+  VscWatch,
+  VscChip,
+  VscLoading,
+  VscWarning,
+  VscChevronLeft,
+} from "react-icons/vsc";
 import type { SubmissionTestResult } from "@workspace/api-client-react";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -43,13 +43,13 @@ function StatusPill({ status }: { status: string }) {
       }`}
     >
       {isPending ? (
-        <Loader2 className="w-4 h-4 animate-spin" />
+        <VscLoading className="w-4 h-4 animate-spin" />
       ) : isGood ? (
-        <CheckCircle2 className="w-4 h-4" />
+        <VscCheck className="w-4 h-4" />
       ) : isPartial ? (
-        <AlertTriangle className="w-4 h-4" />
+        <VscWarning className="w-4 h-4" />
       ) : (
-        <XCircle className="w-4 h-4" />
+        <VscError className="w-4 h-4" />
       )}
       {STATUS_LABEL[status] ?? status}
     </span>
@@ -64,11 +64,11 @@ function TestResultRow({ result, index }: { result: SubmissionTestResult; index:
       <div className="flex items-center justify-between px-3 py-2 bg-accent/30">
         <div className="flex items-center gap-2 text-sm font-medium">
           {passed ? (
-            <CheckCircle2 className="w-4 h-4 text-green-500" />
+            <VscCheck className="w-4 h-4 text-green-500" />
           ) : pending ? (
-            <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+            <VscLoading className="w-4 h-4 text-blue-400 animate-spin" />
           ) : (
-            <XCircle className="w-4 h-4 text-red-500" />
+            <VscError className="w-4 h-4 text-red-500" />
           )}
           Test {index + 1}
           {result.isSample && (
@@ -85,12 +85,12 @@ function TestResultRow({ result, index }: { result: SubmissionTestResult; index:
         <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
           {result.timeMs != null && (
             <span className="flex items-center gap-1">
-              <Clock className="w-3 h-3" /> {result.timeMs}ms
+              <VscWatch className="w-3 h-3" /> {result.timeMs}ms
             </span>
           )}
           {result.memoryKb != null && (
             <span className="flex items-center gap-1">
-              <MemoryStick className="w-3 h-3" /> {Math.round(result.memoryKb / 1024)}MB
+              <VscChip className="w-3 h-3" /> {Math.round(result.memoryKb / 1024)}MB
             </span>
           )}
           <span className={passed ? "text-green-500" : "text-muted-foreground"}>
@@ -168,7 +168,7 @@ function SubmissionDetailContent() {
         href="/submissions"
         className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
       >
-        <ChevronLeft className="w-4 h-4 mr-1" /> Back to submissions
+        <VscChevronLeft className="w-4 h-4 mr-1" /> Back to submissions
       </Link>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">

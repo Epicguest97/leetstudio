@@ -1,7 +1,21 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useListProblems } from "@workspace/api-client-react";
-import { Settings, FolderOpen, Trophy, Search } from "lucide-react";
+import {
+  VscMenu,
+  VscCode,
+  VscFiles,
+  VscHistory,
+  VscMilestone,
+  VscAccount,
+  VscSettingsGear,
+  VscChevronDown,
+  VscChevronRight,
+  VscFolder,
+  VscFolderOpened,
+  VscFileCode,
+  VscGitBranch,
+} from "react-icons/vsc";
 
 // ── VS Code color palette ───────────────────────────────────────────────────
 const C = {
@@ -15,7 +29,7 @@ const C = {
   textDim:    "#c0c7d3",
   blue:       "#007acc",
   blueLight:  "#9fcaff",
-  statusBar:  "#007acc",
+  statusBar:  "#007acc", // Will use inline style for VS Code dark theme
 };
 
 function DiffLabel({ d }: { d: string }) {
@@ -29,10 +43,13 @@ function DiffLabel({ d }: { d: string }) {
 
 function FileIcon({ active }: { active: boolean }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke={active ? C.blueLight : C.textDim} strokeWidth="1.3" style={{ flexShrink: 0 }}>
-      <path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5z" />
-      <polyline points="9.5 1 9.5 4.5 13 4.5" />
-    </svg>
+    <VscFileCode
+      size={14}
+      style={{
+        color: active ? C.blueLight : "#519aba",
+        flexShrink: 0,
+      }}
+    />
   );
 }
 
@@ -124,38 +141,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
           userSelect: "none",
         }}
       >
-        {/* Left: logo + menus */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.blueLight} strokeWidth="2">
-              <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
-            </svg>
-            <span style={{ fontWeight: 600, fontSize: 13, color: C.text }}>LeetStudio</span>
-          </div>
-          <Link href="/">
-            <button
-              style={{ fontSize: 12, color: location === "/" ? C.blueLight : C.textDim, padding: "1px 6px", borderRadius: 3, background: "transparent", border: "none", cursor: "pointer" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              Problems
-            </button>
-          </Link>
-          <Link href="/submissions">
-            <button
-              style={{ fontSize: 12, color: location.startsWith("/submissions") ? C.blueLight : C.textDim, padding: "1px 6px", borderRadius: 3, background: "transparent", border: "none", cursor: "pointer" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              Submissions
-            </button>
-          </Link>
+        {/* Left: hamburger + file icon */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <VscMenu
+            size={16}
+            style={{ color: C.textDim, cursor: "pointer" }}
+            onClick={() => setSidebarOpen(v => !v)}
+          />
+          <VscCode size={16} style={{ color: C.blueLight }} />
+          <span style={{ fontWeight: 600, fontSize: 13, color: C.text }}>LeetStudio</span>
         </div>
 
-        {/* Center: search */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, background: C.activeRow, border: `1px solid ${C.border}`, borderRadius: 4, padding: "0 8px", height: 22, minWidth: 200, cursor: "text" }}>
-          <Search size={11} color={C.textDim} />
-          <span style={{ fontSize: 12, color: C.textDim }}>Search problems...</span>
+        {/* Right: status indicators */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 11, fontFamily: "JetBrains Mono", color: C.textDim }}>
+          <span>Ln 1, Col 1</span>
+          <span>Spaces: 2</span>
+          <span>UTF-8</span>
+          <span>LF</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <VscCode size={12} style={{ color: C.textDim }} />
+            TypeScript
+          </span>
         </div>
       </div>
 
@@ -177,25 +183,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
         >
           {/* Explorer */}
           <ActivityBtn
-            active={sidebarOpen}
+            active={sidebarOpen && (location === "/" || location.startsWith("/problems"))}
             onClick={() => setSidebarOpen((v) => !v)}
             title="Explorer"
           >
-            <FolderOpen size={22} />
+            <VscFiles size={22} />
           </ActivityBtn>
-
-          {/* Submissions */}
-          <Link href="/submissions">
-            <ActivityBtn active={location.startsWith("/submissions")} title="Submissions">
-              <Trophy size={20} />
-            </ActivityBtn>
-          </Link>
 
           <div style={{ flex: 1 }} />
 
+          {/* Dashboard */}
+          <Link href="/dashboard">
+            <ActivityBtn active={location.startsWith("/dashboard")} title="Dashboard" style={{ marginBottom: 4 }}>
+              <VscAccount size={22} />
+            </ActivityBtn>
+          </Link>
+
           {/* Settings */}
           <ActivityBtn active={false} title="Settings" style={{ marginBottom: 4 }}>
-            <Settings size={20} />
+            <VscSettingsGear size={22} />
           </ActivityBtn>
         </div>
 
@@ -262,7 +268,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div
         style={{
           height: 22,
-          background: C.statusBar,
+          background: "#007acc",
           display: "flex",
           alignItems: "center",
           padding: "0 12px",
@@ -275,10 +281,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         }}
       >
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
-          </svg>
-          LeetStudio
+          <VscGitBranch size={12} style={{ color: "#fff" }} />
+          main
         </span>
         {activeProblem && (
           <span style={{ opacity: 0.85 }}>
@@ -286,8 +290,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </span>
         )}
         <span style={{ marginLeft: "auto", opacity: 0.85 }}>
-          Local user
+          Ln 1, Col 1
         </span>
+        <span style={{ opacity: 0.85 }}>Spaces: 2</span>
+        <span style={{ opacity: 0.85 }}>UTF-8</span>
+        <span style={{ opacity: 0.85 }}>LF</span>
       </div>
     </div>
   );
@@ -327,13 +334,16 @@ function Folder({
         onMouseEnter={(e) => e.currentTarget.style.background = C.hoverRow}
         onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
       >
-        <svg width="11" height="11" viewBox="0 0 16 16" fill={C.textDim} style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.1s" }}>
-          <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z" />
-        </svg>
-        <svg width="11" height="11" viewBox="0 0 16 16" fill={C.textDim}>
-          <path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5z" />
-          <polyline points="9.5 1 9.5 4.5 13 4.5" />
-        </svg>
+        {expanded ? (
+          <VscChevronDown size={11} style={{ color: C.textDim }} />
+        ) : (
+          <VscChevronRight size={11} style={{ color: C.textDim }} />
+        )}
+        {expanded ? (
+          <VscFolderOpened size={13} style={{ color: "#dcb265" }} />
+        ) : (
+          <VscFolder size={13} style={{ color: "#dcb265" }} />
+        )}
         {name}
       </div>
       {expanded && problems.map((p) => {

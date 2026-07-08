@@ -1,25 +1,25 @@
 import { Link } from "wouter";
 import { useListSubmissions } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, XCircle, Clock, Activity, AlertCircle, ListChecks } from "lucide-react";
+import { VscCheck, VscError, VscWatch, VscPulse, VscWarning, VscChecklist } from "react-icons/vsc";
 import type { SubmissionStatus } from "@workspace/api-client-react";
 
 function StatusIcon({ status }: { status: SubmissionStatus }) {
   switch (status) {
     case "accepted":
-      return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+      return <VscCheck className="w-4 h-4 text-green-500" />;
     case "partial":
-      return <AlertCircle className="w-4 h-4 text-yellow-500" />;
+      return <VscWarning className="w-4 h-4 text-yellow-500" />;
     case "wrong_answer":
-      return <XCircle className="w-4 h-4 text-red-500" />;
+      return <VscError className="w-4 h-4 text-red-500" />;
     case "time_limit_exceeded":
     case "memory_limit_exceeded":
-      return <Clock className="w-4 h-4 text-yellow-500" />;
+      return <VscWatch className="w-4 h-4 text-yellow-500" />;
     case "queued":
     case "judging":
-      return <Activity className="w-4 h-4 text-blue-500 animate-pulse" />;
+      return <VscPulse className="w-4 h-4 text-blue-500 animate-pulse" />;
     default:
-      return <AlertCircle className="w-4 h-4 text-orange-500" />;
+      return <VscWarning className="w-4 h-4 text-orange-500" />;
   }
 }
 
@@ -44,7 +44,7 @@ function SubmissionsContent() {
       ) : !submissions || submissions.length === 0 ? (
         <Card className="text-center py-16 border-dashed">
           <CardContent>
-            <ListChecks className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <VscChecklist className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-xl font-bold mb-2">No submissions yet</h3>
             <p className="text-muted-foreground mb-6">Solve a problem to see your history here.</p>
             <Link href="/" className="text-primary hover:underline font-medium">

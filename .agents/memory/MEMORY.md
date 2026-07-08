@@ -1,2 +1,0 @@
-- [Design subagent partial completion](design-subagent-partial-completion.md) — large multi-page frontend briefs may finish with some pages as tiny WIP stubs; always verify every page file before considering the build done.
-- [Monaco editor peer dependency](monaco-editor-peer-dep.md) — `@monaco-editor/react` needs `monaco-editor` installed explicitly as a separate package, or it's a missing-peer warning only (not a hard error) but should still be added.
