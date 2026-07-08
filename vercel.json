@@ -3,7 +3,7 @@
   "outputDirectory": "artifacts/codearena/dist/public",
   "functions": {
     "api/index.js": {
-      "includeFiles": "artifacts/{codearena/dist/public,api-server/dist}/**"
+      "includeFiles": "artifacts/*/dist/**"
     }
   },
   "rewrites": [
