@@ -4,11 +4,24 @@ import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
 import { rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
+
+const pkg = JSON.parse(readFileSync(path.resolve(artifactDir, "package.json"), "utf8"));
+const dbPkg = JSON.parse(readFileSync(path.resolve(artifactDir, "../../lib/db/package.json"), "utf8"));
+const zodPkg = JSON.parse(readFileSync(path.resolve(artifactDir, "../../lib/api-zod/package.json"), "utf8"));
+
+const allDeps = new Set([
+  ...Object.keys(pkg.dependencies || {}),
+  ...Object.keys(dbPkg.dependencies || {}),
+  ...Object.keys(zodPkg.dependencies || {}),
+]);
+
+const externalDeps = Array.from(allDeps).filter(dep => !dep.startsWith("@workspace/"));
 
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
@@ -104,6 +117,7 @@ async function buildAll() {
       "puppeteer-core",
       "electron",
       "@electric-sql/pglite",
+      ...externalDeps,
     ],
     sourcemap: "linked",
     plugins: [
