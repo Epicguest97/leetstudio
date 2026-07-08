@@ -16,10 +16,10 @@ import {
   GetSubmissionParams,
   GetSubmissionResponse,
 } from "@workspace/api-zod";
-import { submitToJudge0 } from "../lib/judge0";
-import { enqueueJudge0Dispatch } from "../lib/queue";
-import { getPublicBaseUrl } from "../lib/publicUrl";
-import { logger } from "../lib/logger";
+import { submitToJudge0 } from "../lib/judge0.js";
+import { enqueueJudge0Dispatch } from "../lib/queue.js";
+import { getPublicBaseUrl } from "../lib/publicUrl.js";
+import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 

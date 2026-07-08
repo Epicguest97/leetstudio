@@ -1,6 +1,6 @@
 import { db, submissionsTable, submissionTestResultsTable, testCasesTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
-import { logger } from "./logger";
+import { logger } from "./logger.js";
 
 const FAILURE_PRIORITY: Record<string, number> = {
   compilation_error: 0,

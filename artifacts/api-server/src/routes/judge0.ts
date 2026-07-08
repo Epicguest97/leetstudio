@@ -2,9 +2,9 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, submissionTestResultsTable, submissionsTable, problemsTable, languagesTable } from "@workspace/db";
 import { ReceiveJudge0CallbackParams, ReceiveJudge0CallbackBody, ReceiveJudge0CallbackResponse } from "@workspace/api-zod";
-import { mapJudge0StatusToTestResultStatus } from "../lib/judge0";
-import { recomputeSubmissionOutcome } from "../lib/submissionScoring";
-import { logger } from "../lib/logger";
+import { mapJudge0StatusToTestResultStatus } from "../lib/judge0.js";
+import { recomputeSubmissionOutcome } from "../lib/submissionScoring.js";
+import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 

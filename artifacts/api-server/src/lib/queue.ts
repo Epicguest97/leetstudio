@@ -1,4 +1,4 @@
-import { logger } from "./logger";
+import { logger } from "./logger.js";
 
 /**
  * Lightweight in-process bounded-concurrency task queue.
