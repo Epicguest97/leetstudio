@@ -1,5 +1,1 @@
-# Ignore raw backend source files from deployment to prevent Vercel from auto-detecting them as serverless functions
-artifacts/api-server/src
-artifacts/api-server/tsconfig.json
-artifacts/api-server/package.json
-artifacts/api-server/build.mjs
+# Empty .vercelignore - let Vercel upload source files for the build phase
