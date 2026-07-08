@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/pglite";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { PGlite } from "@electric-sql/pglite";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -1564,7 +1564,7 @@ export async function initializeLocalDatabase() {
 
   for (const language of seedLanguages) {
     const existingLanguage = await localDb.query.languagesTable.findFirst({
-      where: (languageRow, { eq }) => eq(languageRow.judge0Id, language.judge0Id),
+      where: (languageRow) => eq(languageRow.judge0Id, language.judge0Id),
     });
 
     if (!existingLanguage) {
@@ -1574,7 +1574,7 @@ export async function initializeLocalDatabase() {
 
   for (const { problem, testCases } of seedProblems) {
     const existingProblem = await localDb.query.problemsTable.findFirst({
-      where: (problemRow, { eq }) => eq(problemRow.slug, problem.slug),
+      where: (problemRow) => eq(problemRow.slug, problem.slug),
     });
 
     if (existingProblem) {
