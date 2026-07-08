@@ -1,1 +1,5 @@
-# Empty - backend is no longer ignored
+# Ignore raw backend source files from deployment to prevent Vercel from auto-detecting them as serverless functions
+artifacts/api-server/src
+artifacts/api-server/tsconfig.json
+artifacts/api-server/package.json
+artifacts/api-server/build.mjs
