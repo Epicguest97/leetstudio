@@ -17,20 +17,26 @@ import {
   VscChevronUp,
   VscCode,
   VscBook,
+  VscTerminal,
+  VscAdd,
+  VscTrash,
+  VscEllipsis,
+  VscSplitHorizontal,
 } from "react-icons/vsc";
 
 // ── VS Code colors ──────────────────────────────────────────────────────────
 const C = {
-  border:    "#404751",
-  tabBar:    "#1e2020",
-  activeTab: "#121414",
-  inactiveTab: "#2d2f2f",
-  textDim:   "#c0c7d3",
-  text:      "#e3e2e2",
+  border:    "#2b2b2b",
+  tabBar:    "#121212",
+  activeTab: "#1f1f1f",
+  inactiveTab: "#121212",
+  descBg:    "#151515",
+  textDim:   "#858585",
+  text:      "#cccccc",
   blue:      "#007acc",
   blueLight: "#9fcaff",
-  panelBg:   "#1a1c1c",
-  termBg:    "#0d0e0f",
+  panelBg:   "#151515",
+  termBg:    "#151515",
   termGreen: "#4ec994",
   termRed:   "#e06c75",
   termYellow:"#e5c07b",
@@ -208,7 +214,12 @@ function LangTab({
         background: active ? C.activeTab : C.inactiveTab,
         borderTop: active ? `1px solid ${C.blue}` : "1px solid transparent",
         borderRight: `1px solid ${C.border}`,
+        borderBottom: active ? `1px solid ${C.activeTab}` : "1px solid transparent",
+        marginBottom: active ? -1 : 0,
+        zIndex: active ? 10 : 1,
         fontSize: 12,
+        fontStyle: "italic",
+        fontWeight: 400,
         color: active ? C.text : C.textDim,
         cursor: "pointer",
         whiteSpace: "nowrap",
@@ -242,6 +253,11 @@ function Terminal({
   terminalOpen,
   onToggle,
   height,
+  activeTermTab,
+  setActiveTermTab,
+  sampleTestCases,
+  termHeight,
+  setTermHeight,
 }: {
   lines: TermLine[];
   prompt: string;
@@ -252,6 +268,11 @@ function Terminal({
   terminalOpen: boolean;
   onToggle: () => void;
   height: number;
+  activeTermTab: "terminal" | "testcases";
+  setActiveTermTab: (v: "terminal" | "testcases") => void;
+  sampleTestCases: any[];
+  termHeight: number;
+  setTermHeight: (h: number) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLInputElement>(null);
@@ -259,6 +280,26 @@ function Terminal({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = termHeight;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      const newHeight = Math.max(80, Math.min(600, startHeight - deltaY));
+      setTermHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  };
 
   return (
     <div
@@ -268,8 +309,25 @@ function Terminal({
         display: "flex",
         flexDirection: "column",
         flexShrink: 0,
+        position: "relative",
       }}
     >
+      {/* Drag resize handle */}
+      {terminalOpen && (
+        <div
+          onMouseDown={handleMouseDown}
+          style={{
+            position: "absolute",
+            top: -3,
+            left: 0,
+            right: 0,
+            height: 6,
+            cursor: "ns-resize",
+            zIndex: 100,
+            background: "transparent",
+          }}
+        />
+      )}
       {/* Terminal tab bar */}
       <div
         style={{
@@ -279,111 +337,202 @@ function Terminal({
           borderBottom: terminalOpen ? `1px solid ${C.border}` : "none",
           userSelect: "none",
           flexShrink: 0,
+          padding: "0 8px",
+          background: "#181818",
         }}
       >
+        {/* TERMINAL tab */}
         <div
+          onClick={() => setActiveTermTab("terminal")}
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 6,
             padding: "0 12px",
             height: "100%",
-            borderRight: `1px solid ${C.border}`,
-            borderBottom: `1px solid ${C.blue}`,
+            borderBottom: activeTermTab === "terminal" ? `1px solid ${C.blue}` : "none",
             fontSize: 11,
-            fontFamily: "JetBrains Mono",
-            color: C.text,
+            fontWeight: activeTermTab === "terminal" ? 600 : 400,
+            color: activeTermTab === "terminal" ? C.text : C.textDim,
             cursor: "pointer",
-            letterSpacing: "0.04em",
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
           }}
         >
-          TERMINAL
+          Terminal
         </div>
-        <div style={{ flex: 1 }} />
-        <button
-          onClick={onToggle}
-          style={{ background: "transparent", border: "none", cursor: "pointer", color: C.textDim, padding: "4px 10px", display: "flex", alignItems: "center" }}
+
+        {/* TEST CASES tab */}
+        <div
+          onClick={() => setActiveTermTab("testcases")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "0 12px",
+            height: "100%",
+            borderBottom: activeTermTab === "testcases" ? `1px solid ${C.blue}` : "none",
+            fontSize: 11,
+            fontWeight: activeTermTab === "testcases" ? 600 : 400,
+            color: activeTermTab === "testcases" ? C.text : C.textDim,
+            cursor: "pointer",
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+          }}
         >
-          {terminalOpen ? <VscChevronDown size={13} /> : <VscChevronUp size={13} />}
-        </button>
+          Test Cases
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        {/* Right side controls */}
         {terminalOpen && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, color: C.textDim, marginRight: 4 }}>
+            {/* zsh terminal dropdown */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 11,
+                color: C.textDim,
+                padding: "2px 6px",
+                background: "#252526",
+                borderRadius: 3,
+                border: `1px solid ${C.border}`,
+                cursor: "pointer",
+              }}
+            >
+              <VscTerminal size={11} />
+              <span>zsh</span>
+              <VscChevronDown size={9} />
+            </div>
+
+            <VscAdd size={13} style={{ cursor: "pointer" }} title="New Terminal" />
+            <VscSplitHorizontal size={13} style={{ cursor: "pointer", opacity: 0.6 }} title="Split Terminal" />
+            <VscTrash
+              size={13}
+              style={{ cursor: "pointer" }}
+              title="Kill Terminal"
+              onClick={() => onInput("")}
+            />
+            <VscEllipsis size={13} style={{ cursor: "pointer" }} title="More Actions" />
+            <VscClose
+              size={14}
+              style={{ cursor: "pointer" }}
+              title="Close Panel"
+              onClick={onToggle}
+            />
+          </div>
+        )}
+        {!terminalOpen && (
           <button
-            onClick={() => onInput("") }
+            onClick={onToggle}
             style={{ background: "transparent", border: "none", cursor: "pointer", color: C.textDim, padding: "4px 10px", display: "flex", alignItems: "center" }}
-            title="Clear terminal"
           >
-            <VscClose size={13} />
+            <VscChevronUp size={13} />
           </button>
         )}
       </div>
 
       {terminalOpen && (
         <div
-          style={{ height, background: C.termBg, overflow: "hidden", display: "flex", flexDirection: "column", cursor: "text" }}
-          onClick={() => inputRef.current?.focus()}
+          style={{ height, background: C.termBg, overflow: "hidden", display: "flex", flexDirection: "column", cursor: activeTermTab === "terminal" ? "text" : "default" }}
+          onClick={() => {
+            if (activeTermTab === "terminal") inputRef.current?.focus();
+          }}
         >
-          {/* Output area */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px 4px", fontFamily: "JetBrains Mono", fontSize: 12, lineHeight: "18px" }}>
-            {lines.map((line, i) => {
-              if (line.type === "blank") return <div key={i} style={{ height: 6 }} />;
-              if (line.type === "command") return (
-                <div key={i} style={{ color: C.termGreen }}>
-                  <span style={{ color: C.termCyan }}>{prompt}</span>
-                  <span>{line.text}</span>
-                </div>
-              );
-              return (
-                <div key={i} style={{ color: line.color ?? C.text, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                  {line.text}
-                </div>
-              );
-            })}
-            {loading && (
-              <div style={{ color: C.termCyan, display: "flex", alignItems: "center", gap: 6 }}>
-                <VscLoading size={11} style={{ animation: "spin 1s linear infinite" }} />
-                Waiting for judge...
-              </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
-
-          {/* Input line */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              padding: "4px 12px 8px",
-              gap: 0,
-              fontFamily: "JetBrains Mono",
-              fontSize: 12,
-              flexShrink: 0,
-            }}
-          >
-            <span style={{ color: C.termCyan, userSelect: "none", marginRight: 4 }}>{prompt}</span>
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => onInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onEnter();
-              }}
-              disabled={loading}
-              spellCheck={false}
-              autoComplete="off"
+          {activeTermTab === "terminal" ? (
+            /* Scrollable terminal container */
+            <div
               style={{
                 flex: 1,
-                background: "transparent",
-                border: "none",
-                outline: "none",
-                color: C.text,
-                fontFamily: "JetBrains Mono",
+                overflowY: "auto",
+                padding: "12px 16px",
+                fontFamily: "Menlo, Monaco, Consolas, 'Courier New', monospace",
                 fontSize: 12,
-                caretColor: C.text,
-                opacity: loading ? 0.5 : 1,
+                lineHeight: "18px",
               }}
-              placeholder={loading ? "" : "type a command..."}
-            />
-          </div>
+            >
+              {lines.map((line, i) => {
+                if (line.type === "blank") return <div key={i} style={{ height: 6 }} />;
+                if (line.type === "command") return (
+                  <div key={i}>
+                    <span style={{ color: C.textDim, marginRight: 6 }}>{prompt}</span>
+                    <span style={{ color: C.text }}>{line.text}</span>
+                  </div>
+                );
+                return (
+                  <div key={i} style={{ color: line.color ?? C.text, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                    {line.text}
+                  </div>
+                );
+              })}
+              {loading && (
+                <div style={{ color: C.termCyan, display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                  <VscLoading size={11} style={{ animation: "spin 1s linear infinite" }} />
+                  Waiting for judge...
+                </div>
+              )}
+
+              {/* Input line inside scroll view */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "4px 0 0 0",
+                  gap: 0,
+                }}
+              >
+                <span style={{ color: C.textDim, marginRight: 6, userSelect: "none" }}>{prompt}</span>
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => onInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") onEnter();
+                  }}
+                  disabled={loading}
+                  spellCheck={false}
+                  autoComplete="off"
+                  style={{
+                    flex: 1,
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
+                    color: C.text,
+                    fontFamily: "Menlo, Monaco, Consolas, 'Courier New', monospace",
+                    fontSize: 12,
+                    caretColor: "#ffffff",
+                    opacity: loading ? 0.5 : 1,
+                  }}
+                  placeholder={loading ? "" : "type a command..."}
+                />
+              </div>
+              <div ref={bottomRef} />
+            </div>
+          ) : (
+            /* Test cases content */
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px", fontSize: 13, color: C.text, fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
+              {sampleTestCases.length > 0 ? (
+                <div>
+                  {sampleTestCases.map((tc, i) => (
+                    <div key={tc.id} style={{ marginBottom: 16 }}>
+                      <p style={{ margin: "0 0 6px", fontWeight: 600, color: C.text }}>Example {i + 1}:</p>
+                      <div style={{ background: "#252526", border: `1px solid ${C.border}`, borderRadius: 3, padding: "10px 12px", fontFamily: "Menlo, Monaco, Consolas, 'Courier New', monospace", fontSize: 12 }}>
+                        <div style={{ marginBottom: tc.expectedOutput ? 6 : 0 }}>
+                          <span style={{ color: C.textDim }}>Input: </span><span>{tc.stdin || "(empty)"}</span>
+                        </div>
+                        {tc.expectedOutput && (
+                          <div><span style={{ color: C.textDim }}>Output: </span><span>{tc.expectedOutput}</span></div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ color: C.textDim, fontSize: 12 }}>No sample test cases available for this problem.</div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -454,7 +603,9 @@ export default function ProblemDetail() {
 
   // Terminal prompt
   const problemSlug = problem ? problem.title.toLowerCase().replace(/\s+/g, "-") : "problem";
-  const prompt = `~/leetstudio/${problemSlug}$ `;
+  const prompt = `mehul@Mehuls-MacBook-Air ~ % `;
+  const [activeTermTab, setActiveTermTab] = useState<"terminal" | "testcases">("terminal");
+  const [termHeight, setTermHeight] = useState(200);
 
   // Update hint in terminal when tab or problem changes
   useEffect(() => {
@@ -602,8 +753,9 @@ export default function ProblemDetail() {
         <div
           style={{
             display: "flex", alignItems: "center", gap: 6, padding: "0 14px", height: "100%",
-            background: "transparent", borderTop: "1px solid transparent", borderRight: `1px solid ${C.border}`,
-            fontSize: 12, color: C.textDim, userSelect: "none", flexShrink: 0,
+            background: C.descBg, borderTop: "1px solid transparent", borderRight: `1px solid ${C.border}`,
+            borderBottom: `1px solid ${C.descBg}`, marginBottom: -1, zIndex: 10,
+            fontSize: 12, color: C.text, userSelect: "none", flexShrink: 0,
           }}
         >
           <VscBook size={13} style={{ marginRight: 2 }} />
@@ -631,6 +783,7 @@ export default function ProblemDetail() {
           style={{
             width: "40%", borderRight: `1px solid ${C.border}`,
             display: "flex", flexDirection: "column", overflow: "hidden",
+            background: C.descBg,
           }}
         >
           {/* Header */}
@@ -716,7 +869,12 @@ export default function ProblemDetail() {
             loading={createSubmission.isPending || isJudging}
             terminalOpen={termOpen}
             onToggle={() => setTermOpen((v) => !v)}
-            height={termOpen ? 200 : 0}
+            height={termOpen ? termHeight : 0}
+            activeTermTab={activeTermTab}
+            setActiveTermTab={setActiveTermTab}
+            sampleTestCases={problem?.sampleTestCases || []}
+            termHeight={termHeight}
+            setTermHeight={setTermHeight}
           />
         </div>
       </div>
